@@ -3,8 +3,8 @@ vertx-redisques
 
 A highly scalable redis-persistent queuing system for vertx.
 
-Queues
-------
+Dynamic Queues
+--------------
 
 They are stored as redis lists, thus created only when needed and removed when empty. 
 There is nothing left even if you just used thousands of queues with thousands of messages.
