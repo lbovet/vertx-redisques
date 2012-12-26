@@ -12,10 +12,16 @@ There is nothing left even if you just used thousands of queues with thousands o
 Smart Consuming
 ---------------
 
-It is guaranteed that a queue is consumed by the same RedisQueVerticle instance (a consumer). 
+It is guaranteed that a queue is consumed by the same RedisQuesVerticle instance (a consumer). 
 If no consumer is registered for a queue, one is assigned (this uses redis setnx to ensure only one is assigned). 
 When idle for a given time, a consumer is removed. This prevents subscription leaks and makes recovering automatic
 when a consumer dies.
+
+Safe Distribution
+-----------------
+
+There is no single point of control/failure. Just create many instances of RedisQUesVerticle, they will work together. 
+If an instance dies, its queues will be took-over by other instances.
 
 Dependencies
 ------------
