@@ -20,7 +20,7 @@ when a consumer dies.
 Safe Distribution
 -----------------
 
-There is no single point of control/failure. Just create many instances of RedisQUesVerticle, they will work together. 
+There is no single point of control/failure. Just create many instances of RedisQuesVerticle, they will work together. 
 If an instance dies, its queues will be took-over by other instances.
 
 Dependencies
