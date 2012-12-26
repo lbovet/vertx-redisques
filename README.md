@@ -21,7 +21,7 @@ Safe Distribution
 -----------------
 
 There is no single point of control/failure. Just create many instances of RedisQuesVerticle, they will work together. 
-If an instance dies, its queues will be took-over by other instances.
+If an instance dies, its queues will assigned to other instances.
 
 Dependencies
 ------------
