@@ -103,7 +103,7 @@ public class TestVerticle extends Verticle {
                 log.info("Processing message " + payload);
                 vertx.setTimer(new Integer(payload), new Handler<Long>() {
                     public void handle(Long event) {
-                        log.debug("Processed message " + payload);
+                        log.debug("Processed message " + message);
                         message.reply();
                     }
                 });

@@ -389,7 +389,6 @@ public class RedisQuesVerticle extends Verticle {
         final long start = System.currentTimeMillis();
         eb.send(processorAddress, message, new Handler<Message<String>>() {
             public void handle(Message<String> event) {
-                log.debug("Processed message " + message);
                 doneHandler.handle(System.currentTimeMillis() - start);
             }
         });
