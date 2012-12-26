@@ -16,10 +16,6 @@ import org.vertx.java.deploy.Verticle;
 
 public class RedisQuesVerticle extends Verticle {
 
-    // Consumers periodically refresh their subscription while they are
-    // consuming.
-    private static int REFRESH_PERIOD = 10;
-
     // State of each queue. Consuming means there is a message being processed.
     private enum QueueState {
         READY, CONSUMING
@@ -46,6 +42,10 @@ public class RedisQuesVerticle extends Verticle {
     // Address of message processors
     private String processorAddress = "redisques-processor";
 
+    // Consumers periodically refresh their subscription while they are
+    // consuming.
+    private int refreshPeriod = 10;
+    
     // Handler receiving registration requests when no consumer is registered
     // for a queue.
     private Handler<Message<String>> registrationRequestHandler = new Handler<Message<String>>() {
@@ -86,7 +86,8 @@ public class RedisQuesVerticle extends Verticle {
         redisAddress = config.getString("redis-address") != null ? config.getString("redis-address") : redisAddress;
         redisPrefix = config.getString("redis-prefix") != null ? config.getString("redis-prefix") : redisPrefix;
         processorAddress = config.getString("processor-address") != null ? config.getString("processor-address") : processorAddress;
-
+        refreshPeriod = config.getNumber("refresh-period") != null ? config.getNumber("refresh-period").intValue() : refreshPeriod;
+        
         // Handles operations
         eb.registerHandler("redisques", new Handler<Message<JsonObject>>() {
             public void handle(final Message<JsonObject> event) {
@@ -153,7 +154,7 @@ public class RedisQuesVerticle extends Verticle {
         });
 
         // Periodic refresh of my registrations on active queues.
-        vertx.setPeriodic(REFRESH_PERIOD * 1000, new Handler<Long>() {
+        vertx.setPeriodic(refreshPeriod * 1000, new Handler<Long>() {
             public void handle(Long event) {
                 for (final Map.Entry<String, QueueState> entry : myQueues.entrySet()) {
                     if (entry.getValue() == QueueState.CONSUMING) {
@@ -181,7 +182,7 @@ public class RedisQuesVerticle extends Verticle {
         });
 
         // Periodic wake up of all consumers
-        vertx.setPeriodic(3 * REFRESH_PERIOD * 1000, new Handler<Long>() {
+        vertx.setPeriodic(3 * refreshPeriod * 1000, new Handler<Long>() {
             public void handle(Long event) {
                 wakeConsumers();
             }
@@ -424,7 +425,7 @@ public class RedisQuesVerticle extends Verticle {
         JsonObject command = new JsonObject();
         command.putString("command", "expire");
         command.putString("key", redisPrefix + "consumers" + queue);
-        command.putNumber("seconds", 2 * REFRESH_PERIOD);
+        command.putNumber("seconds", 2 * refreshPeriod);
         if (handler != null) {
             vertx.eventBus().send(redisAddress, command, handler);
         } else {
