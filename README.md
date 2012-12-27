@@ -27,3 +27,14 @@ Dependencies
 ------------
 
 RedisQues depends on redis-client module "de.marx-labs.redis-client-v0.3" which currently needs vertx 1.2.
+
+Run the Example
+---------------
+
+Just run the TestVerticle, it listens to 8888 and accepts HTTP PUT requests as messages to queue. 
+The URL path is used as queue name.
+
+The message processor is simply a time wait.
+
+The PUT body is the number of milliseconds that the message processor will wait, 
+allowing simulation of a long processing.
