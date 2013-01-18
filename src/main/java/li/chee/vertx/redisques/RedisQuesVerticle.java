@@ -199,8 +199,8 @@ public class RedisQuesVerticle extends Verticle {
         final EventBus eb = vertx.eventBus();
         eb.unregisterHandler("consumers", registrationRequestHandler, new AsyncResultHandler<Void>() {
             public void handle(AsyncResult<Void> event) {
-                eb.unregisterHandler(uid, new AsyncResultHandler<Void>() {
-                    public void handle(AsyncResult<Void> event) {
+                eb.unregisterHandler(uid, new Handler<Message<Void>>() {
+                    public void handle(Message<Void> message) {
                         unregisterConsumers(false);
                         stoppedHandler = doneHandler;
                         if (myQueues.keySet().isEmpty()) {

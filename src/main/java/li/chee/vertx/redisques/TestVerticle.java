@@ -21,7 +21,7 @@ public class TestVerticle extends Verticle {
         redisConfig.putString("address", "redis-client");
         redisConfig.putString("host", "localhost");
         redisConfig.putNumber("port", 6379);
-        container.deployModule("de.marx-labs.redis-client-v0.3", redisConfig, 1, new Handler<String>() {
+        container.deployModule("de.marx-labs.redis-client-v0.4", redisConfig, 1, new Handler<String>() {
             public void handle(String event) {
                 container.deployVerticle(RedisQuesVerticle.class.getName(), new JsonObject(), 4, new Handler<String>() {
                     public void handle(String event) {
