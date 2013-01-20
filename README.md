@@ -21,7 +21,7 @@ Safe Distribution
 -----------------
 
 There is no single point of control/failure. Just create many instances of RedisQues, they will work together. 
-If an instance dies, its queues will assigned to other instances.
+If an instance dies, its queues will be assigned to other instances.
 
 Dependencies
 ------------
