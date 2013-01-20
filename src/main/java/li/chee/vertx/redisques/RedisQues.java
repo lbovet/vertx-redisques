@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.vertx.java.busmods.BusModBase;
 import org.vertx.java.core.AsyncResult;
 import org.vertx.java.core.AsyncResultHandler;
 import org.vertx.java.core.Handler;
@@ -12,9 +13,8 @@ import org.vertx.java.core.eventbus.Message;
 import org.vertx.java.core.json.JsonArray;
 import org.vertx.java.core.json.JsonObject;
 import org.vertx.java.core.logging.Logger;
-import org.vertx.java.deploy.Verticle;
 
-public class RedisQuesVerticle extends Verticle {
+public class RedisQues extends BusModBase {
 
     // State of each queue. Consuming means there is a message being processed.
     private enum QueueState {
@@ -37,18 +37,25 @@ public class RedisQuesVerticle extends Verticle {
     private String redisAddress = "redis-client";
 
     // Prefix for redis keys holding queues and consumers
-    private String redisPrefix = "redisques/";
+    private String redisPrefix = "redisques:";
 
+    // Prefix for queues
+    private String queuesPrefix = "queues:";
+    
+    // Prefix for consumers
+    private String consumersPrefix = "consumers:";
+    
     // Address of message processors
     private String processorAddress = "redisques-processor";
 
     // Consumers periodically refresh their subscription while they are
     // consuming.
     private int refreshPeriod = 10;
-    
+       
     // Handler receiving registration requests when no consumer is registered
     // for a queue.
     private Handler<Message<String>> registrationRequestHandler = new Handler<Message<String>>() {
+
         public void handle(Message<String> event) {
             final EventBus eb = vertx.eventBus();
             final String queue = event.body;
@@ -56,7 +63,7 @@ public class RedisQuesVerticle extends Verticle {
             // Try to register for this queue
             JsonObject command = new JsonObject();
             command.putString("command", "setnx");
-            command.putString("key", redisPrefix + "consumers" + queue);
+            command.putString("key", redisPrefix + consumersPrefix + queue);
             command.putString("value", uid);
             eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                 public void handle(Message<JsonObject> jsonAnswer) {
@@ -76,7 +83,7 @@ public class RedisQuesVerticle extends Verticle {
     };
 
     @Override
-    public void start() throws Exception {
+    public void start() {
         log = container.getLogger();
         final EventBus eb = vertx.eventBus();
         log.info("Started with UID " + uid);
@@ -91,7 +98,6 @@ public class RedisQuesVerticle extends Verticle {
         // Handles operations
         eb.registerHandler("redisques", new Handler<Message<JsonObject>>() {
             public void handle(final Message<JsonObject> event) {
-                System.out.println(event.body);
                 String operation = event.body.getString("operation");
                 switch (operation) {
                 case "enqueue":
@@ -99,14 +105,14 @@ public class RedisQuesVerticle extends Verticle {
                     final String message = event.body.getString("message");
                     JsonObject command = new JsonObject();
                     command.putString("command", "rpush");
-                    command.putString("key", redisPrefix + "queues" + queue);
+                    command.putString("key", redisPrefix + queuesPrefix + queue);
                     command.putArray("values", new JsonArray(new String[] { message }));
                     // Send it to the queue
                     eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                         public void handle(Message<JsonObject> jsonAnswer) {
                             Map<String, Object> answer = jsonAnswer.body.toMap();
-                            JsonObject reply = new JsonObject();
-                            if ("error".equals(answer.get("status"))) {
+                            JsonObject reply = new JsonObject();                            
+                            if (!"ok".equals(answer.get("status"))) {
                                 log.error("Error while enqueing message into queue " + queue + " : " + jsonAnswer.body.getString("message"));
                                 reply.putString("status", "error");
                                 reply.putString("message", jsonAnswer.body.getString("message"));
@@ -162,7 +168,7 @@ public class RedisQuesVerticle extends Verticle {
                         // Check if I am still the registered consumer
                         JsonObject command = new JsonObject();
                         command.putString("command", "get");
-                        command.putString("key", redisPrefix + "consumers" + queue);
+                        command.putString("key", redisPrefix + consumersPrefix + queue);
                         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                             @Override
                             public void handle(Message<JsonObject> event) {
@@ -223,14 +229,14 @@ public class RedisQuesVerticle extends Verticle {
                         // Make sure that I am still the registered consumer
                         JsonObject command = new JsonObject();
                         command.putString("command", "get");
-                        command.putString("key", redisPrefix + "consumers" + queue);
+                        command.putString("key", redisPrefix + consumersPrefix + queue);
                         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                             public void handle(Message<JsonObject> event) {
                                 String consumer = event.body.getString("value");
                                 if (uid.equals(consumer)) {
                                     JsonObject command = new JsonObject();
                                     command.putString("command", "del");
-                                    command.putString("key", "consumers" + queue);
+                                    command.putString("key", consumersPrefix + queue);
                                     myQueues.remove(queue);
                                 }
                             }
@@ -250,7 +256,7 @@ public class RedisQuesVerticle extends Verticle {
         final EventBus eb = vertx.eventBus();
         JsonObject command = new JsonObject();
         command.putString("command", "keys");
-        command.putString("pattern", redisPrefix + "consumers/*");
+        command.putString("pattern", redisPrefix + consumersPrefix+"*");
         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
             @Override
             public void handle(Message<JsonObject> event) {
@@ -273,7 +279,7 @@ public class RedisQuesVerticle extends Verticle {
         final EventBus eb = vertx.eventBus();
         JsonObject command = new JsonObject();
         command.putString("command", "keys");
-        command.putString("pattern", redisPrefix + "queues/*");
+        command.putString("pattern", redisPrefix + queuesPrefix+"*");
         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
             @Override
             public void handle(Message<JsonObject> event) {
@@ -282,7 +288,7 @@ public class RedisQuesVerticle extends Verticle {
                     log.debug("Waking up consumers for " + list.size() + " queue(s)");
                 }
                 for (Object queue : list) {
-                    notifyConsumer(queue.toString().substring((redisPrefix + "queues").length()));
+                    notifyConsumer(queue.toString().substring((redisPrefix + queuesPrefix).length()));
                 }
             }
         });
@@ -297,7 +303,7 @@ public class RedisQuesVerticle extends Verticle {
                 // Make sure that I am still the registered consumer
                 JsonObject command = new JsonObject();
                 command.putString("command", "get");
-                command.putString("key", redisPrefix + "consumers" + queue);
+                command.putString("key", redisPrefix + consumersPrefix + queue);
                 eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                     public void handle(Message<JsonObject> event) {
                         String consumer = event.body.getString("value");
@@ -334,20 +340,20 @@ public class RedisQuesVerticle extends Verticle {
         final EventBus eb = vertx.eventBus();
         JsonObject command = new JsonObject();
         command.putString("command", "lindex");
-        command.putString("key", redisPrefix + "queues" + queue);
+        command.putString("key", redisPrefix + queuesPrefix + queue);
         command.putNumber("index", 0);
         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
             public void handle(Message<JsonObject> answer) {
                 if (answer.body.getString("value") != null) {
                     if (myQueues.get(queue) != QueueState.CONSUMING) {
                         myQueues.put(queue, QueueState.CONSUMING);
-                        processMessage(answer.body.getString("value"), new Handler<Long>() {
+                        processMessage(queue, answer.body.getString("value"), new Handler<Long>() {
                             public void handle(Long event) {
                                 log.info("Message from queue " + queue + " processed in " + event.longValue() + " milliseconds");
                                 // Remove the processed message from the queue
                                 JsonObject command = new JsonObject();
                                 command.putString("command", "lpop");
-                                command.putString("key", redisPrefix + "queues" + queue);
+                                command.putString("key", redisPrefix + queuesPrefix + queue);
                                 eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                                     public void handle(Message<JsonObject> jsonAnswer) {
                                         log.debug("Message removed, queue " + queue + " is ready again");
@@ -364,7 +370,7 @@ public class RedisQuesVerticle extends Verticle {
                                         // message if any
                                         JsonObject command = new JsonObject();
                                         command.putString("command", "llen");
-                                        command.putString("key", redisPrefix + "queues" + queue);
+                                        command.putString("key", redisPrefix + queuesPrefix + queue);
                                         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                                             public void handle(Message<JsonObject> answer) {
                                                 if (answer.body.getNumber("value").intValue() > 0) {
@@ -385,11 +391,14 @@ public class RedisQuesVerticle extends Verticle {
         });
     }
 
-    private void processMessage(final String message, final Handler<Long> doneHandler) {
+    private void processMessage(final String queue, final String payload, final Handler<Long> doneHandler) {
         final EventBus eb = vertx.eventBus();
         final long start = System.currentTimeMillis();
-        eb.send(processorAddress, message, new Handler<Message<String>>() {
-            public void handle(Message<String> event) {
+        JsonObject message = new JsonObject();
+        message.putString("queue", queue);
+        message.putString("payload", payload);
+        eb.send(processorAddress, message, new Handler<Message<JsonObject>>() {
+            public void handle(Message<JsonObject> event) {
                 doneHandler.handle(System.currentTimeMillis() - start);
             }
         });
@@ -402,7 +411,7 @@ public class RedisQuesVerticle extends Verticle {
         // Find the consumer to notify
         JsonObject command = new JsonObject();
         command.putString("command", "get");
-        command.putString("key", redisPrefix + "consumers" + queue);
+        command.putString("key", redisPrefix + consumersPrefix + queue);
         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
             public void handle(Message<JsonObject> jsonAnswer) {
                 String consumer = jsonAnswer.body.getString("value");
@@ -424,7 +433,7 @@ public class RedisQuesVerticle extends Verticle {
         log.debug("Refreshing registration of queue " + queue);
         JsonObject command = new JsonObject();
         command.putString("command", "expire");
-        command.putString("key", redisPrefix + "consumers" + queue);
+        command.putString("key", redisPrefix + consumersPrefix + queue);
         command.putNumber("seconds", 2 * refreshPeriod);
         if (handler != null) {
             vertx.eventBus().send(redisAddress, command, handler);
