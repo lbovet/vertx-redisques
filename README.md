@@ -20,21 +20,15 @@ when a consumer dies.
 Safe Distribution
 -----------------
 
-There is no single point of control/failure. Just create many instances of RedisQuesVerticle, they will work together. 
+There is no single point of control/failure. Just create many instances of RedisQues, they will work together. 
 If an instance dies, its queues will assigned to other instances.
 
 Dependencies
 ------------
 
-RedisQues depends on redis-client module "de.marx-labs.redis-client-v0.3" which currently needs vertx 1.2.
+RedisQues 0.2 use the redis-client busmod "de.marx-labs.redis-client" which currently (as of version v0.3) needs vertx 1.2 
+and does not work with vertx 1.3.
 
-Run the Example
----------------
-
-Just run the TestVerticle, it listens to 8888 and accepts HTTP PUT requests as messages to queue. 
-The URL path is used as queue name.
-
-The message processor is simply a time wait.
-
-The PUT body is the number of milliseconds that the message processor will wait, 
-allowing simulation of a long processing.
+RedisQues 0.3 is built for vertx 1.3 and thus requires a "de.marx-labs.redis-client" compatible with vertx 1.3. 
+Until it is officially provided, here is a fork that works with vertx 1.3: https://github.com/lbovet/vert.x-busmod-redis, 
+you will need to build it by yourself, though.
