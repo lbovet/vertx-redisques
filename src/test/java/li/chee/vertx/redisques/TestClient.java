@@ -25,9 +25,9 @@ public class TestClient extends TestClientBase {
         redisConfig.putString("address", "redis-client");
         redisConfig.putString("host", "localhost");
         redisConfig.putNumber("port", 6379);
-        container.deployModule("de.marx-labs.redis-client-v0.3", redisConfig, 2, new Handler<String>() {
+        container.deployModule("de.marx-labs.redis-client-v0.4", redisConfig, 2, new Handler<String>() {
             public void handle(String res) {
-                container.deployModule("li.chee.redisques-v0.2", new JsonObject(), 4, new Handler<String>() {
+                container.deployModule("li.chee.redisques-v0.3", new JsonObject(), 4, new Handler<String>() {
                     public void handle(String event) {
                         // Clean
                         JsonObject command = new JsonObject();
