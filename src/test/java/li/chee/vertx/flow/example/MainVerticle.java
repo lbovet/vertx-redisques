@@ -27,16 +27,21 @@ public class MainVerticle extends TestClientBase {
     public void testIt() {
 
         final EventBus eb = vertx.eventBus();
-        final JsonObject body = new JsonObject();
-        
+        final JsonObject body = new JsonObject() {
+            {
+                putString("hello", "World");
+            }
+        };
+
         new Step<String>() {
             public void run() {
                 System.out.println("Deploying slave");
                 container.deployVerticle(SlaveVerticle.class.getName(), null, 1, this);
             }
         }.
-
-        // Test the normal case (success)
+        /*
+         * Test the normal case (success)
+         */
         then(new SimpleStep() {
             protected void run() {
                 body.putString("command", "success");
@@ -44,14 +49,17 @@ public class MainVerticle extends TestClientBase {
             }
         }).
 
-        then(new JsonBusMessage()).send(eb, "slave-json", body). /**/
+        then(new JsonBusMessage()). /**/
+        send(eb, "slave-json", body). /**/
         success(new Handler<Message<JsonObject>>() {
             public void handle(Message<JsonObject> event) {
                 System.out.println("success");
             }
-        }). /**/
-        
-        // Error case
+        }).
+
+        /*
+         * Error case
+         */
         then(new SimpleStep() {
             protected void run() {
                 body.putString("command", "error");
@@ -78,8 +86,9 @@ public class MainVerticle extends TestClientBase {
                 tu.azzert(false, "Unexpected timeout");
             }
         }).
-
-        // Timeout
+        /*
+         * Timeout
+         */
         then(new SimpleStep() {
             protected void run() {
                 body.putString("command", "wait");
@@ -99,10 +108,11 @@ public class MainVerticle extends TestClientBase {
             protected void handle() {
                 System.out.println("Got expected timeout 1");
             }
-        }). 
+        }). /**/
         continueAfterTimeout().
-        
-        // Another type of bus message
+        /*
+         * Another type of message
+         */
         then(new LongBusMessage()).send(eb, "slave-long", 34L). /**/
         timeout(vertx, 500L, new SimpleHandler() {
             protected void handle() {
