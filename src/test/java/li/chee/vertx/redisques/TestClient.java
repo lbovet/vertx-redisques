@@ -27,7 +27,7 @@ public class TestClient extends TestClientBase {
         redisConfig.putNumber("port", 6379);
         container.deployModule("de.marx-labs.redis-client-v0.4", redisConfig, 2, new Handler<String>() {
             public void handle(String res) {
-                container.deployModule("li.chee.redisques-v0.3", new JsonObject(), 4, new Handler<String>() {
+                container.deployModule("li.chee.redisques-v0.4", new JsonObject(), 4, new Handler<String>() {
                     public void handle(String event) {
                         // Clean
                         JsonObject command = new JsonObject();
@@ -90,7 +90,7 @@ public class TestClient extends TestClientBase {
     int numMessages = 50;
     int finished = 0;
 
-    class Sender implements Handler<Message<JsonObject>> {
+    class Sender {
         final String queue;
         int messageCount;
         MessageDigest signature;
@@ -116,16 +116,30 @@ public class TestClient extends TestClientBase {
             });
         }
 
-        void sendNext() {
+        void send(final String m) {
             if (messageCount < numMessages) {
-                String message = Double.toString(Math.random());
+                final String message;
+                if(m==null) {
+                    message = Double.toString(Math.random());
+                } else {
+                    message = m;
+                }
                 System.out.println("SENDING [" + messageCount + "] " + message + " to " + queue);
                 signature.update(message.getBytes());
                 JsonObject operation = new JsonObject();
                 operation.putString("operation", "enqueue");
                 operation.putString("queue", queue);
                 operation.putString("message", message);
-                eb.send("redisques", operation, this);
+                eb.send("redisques", operation, new Handler<Message<JsonObject>>() {
+                    public void handle(Message<JsonObject> event) {
+                        if(event.body.getString("status").equals("ok")) {
+                            send(null);
+                        } else {
+                            System.out.println("ERROR sending "+message+" to "+queue);
+                            send(message);
+                        }
+                    }
+                });
                 messageCount++;
             } else {
                 JsonObject operation = new JsonObject();
@@ -139,16 +153,11 @@ public class TestClient extends TestClientBase {
                 });
             }
         }
-
-        @Override
-        public void handle(Message<JsonObject> event) {
-            sendNext();
-        }
     }
 
     public void testMore() throws Exception {
         for (int i = 0; i < numQueues; i++) {
-            new Sender("queue" + i).sendNext();
+            new Sender("queue" + i).send(null);
         }
     }
 }
