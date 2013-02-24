@@ -41,7 +41,7 @@ public class TestProcessor extends Verticle {
                     counters.put(queue, 0);
                 }
                 
-                System.out.println("GOT ["+counters.get(queue)+"] " + payload + " in " + queue);
+                System.out.println("GOT " + payload + " in " + queue);
                 
                 counters.put(queue, counters.get(queue)+1);
                 
