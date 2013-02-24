@@ -124,7 +124,7 @@ public class TestClient extends TestClientBase {
                 } else {
                     message = m;
                 }
-                System.out.println("SENDING [" + messageCount + "] " + message + " to " + queue);
+                System.out.println("SENDING [" + messageCount + "] " + message + " to " + queue+".");
                 signature.update(message.getBytes());
                 JsonObject operation = new JsonObject();
                 operation.putString("operation", "enqueue");
