@@ -16,33 +16,37 @@ import org.vertx.java.core.logging.Logger;
 import org.vertx.java.deploy.Verticle;
 import org.vertx.java.framework.TestUtils;
 
-public class TestProcessor extends Verticle {    
-    
+public class TestProcessor extends Verticle {
+
     private TestUtils tu;
-    
+
     private Map<String, MessageDigest> signatures = new HashMap<String, MessageDigest>();
-    
+
     @Override
     public void start() throws Exception {
         final Logger log = container.getLogger();
 
         final EventBus eb = vertx.eventBus();
-        
+
         tu = new TestUtils(vertx);
-        
+
         eb.registerHandler("redisques-processor", new Handler<Message<JsonObject>>() {
             public void handle(final Message<JsonObject> message) {
                 final String queue = message.body.getString("queue");
                 final String payload = message.body.getString("payload");
 
-                System.out.println("GOT "+payload+" in "+queue);
-                
-                if("STOP".equals(payload)) {
-                    message.reply();
-                    eb.send("digest-"+queue, DatatypeConverter.printBase64Binary(signatures.get(queue).digest()));
+                System.out.println("GOT " + payload + " in " + queue);
+
+                if ("STOP".equals(payload)) {
+                    message.reply(new JsonObject() {
+                        {
+                            putString("status", "ok");
+                        }
+                    });
+                    eb.send("digest-" + queue, DatatypeConverter.printBase64Binary(signatures.get(queue).digest()));
                 } else {
                     MessageDigest signature = signatures.get(queue);
-                    if(signature == null) {
+                    if (signature == null) {
                         try {
                             signature = MessageDigest.getInstance("MD5");
                             signatures.put(queue, signature);
@@ -52,17 +56,21 @@ public class TestProcessor extends Verticle {
                     }
                     signature.update(payload.getBytes());
                 }
-                
+
                 log.info("Processing message " + payload);
                 vertx.setTimer(new Random().nextLong() % 1, new Handler<Long>() {
                     public void handle(Long event) {
                         log.debug("Processed message " + payload);
-                        message.reply();
+                        message.reply(new JsonObject() {
+                            {
+                                putString("status", "ok");
+                            }
+                        });
                     }
                 });
             }
         });
-        
+
         tu.appReady();
     }
 
@@ -71,5 +79,4 @@ public class TestProcessor extends Verticle {
         tu.appStopped();
     }
 
-    
 }

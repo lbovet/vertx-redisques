@@ -27,7 +27,7 @@ public class TestClient extends TestClientBase {
         redisConfig.putNumber("port", 6379);
         container.deployModule("de.marx-labs.redis-client-v0.4", redisConfig, 2, new Handler<String>() {
             public void handle(String res) {
-                container.deployModule("li.chee.redisques-v0.4", new JsonObject(), 4, new Handler<String>() {
+                container.deployModule("li.chee.redisques-v0.5", new JsonObject(), 4, new Handler<String>() {
                     public void handle(String event) {
                         // Clean
                         JsonObject command = new JsonObject();
