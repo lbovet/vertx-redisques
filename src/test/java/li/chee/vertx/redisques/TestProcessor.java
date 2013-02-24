@@ -30,13 +30,21 @@ public class TestProcessor extends Verticle {
 
         tu = new TestUtils(vertx);
 
+        final Map<String, Integer> counters = new HashMap<>();
+        
         eb.registerHandler("redisques-processor", new Handler<Message<JsonObject>>() {
             public void handle(final Message<JsonObject> message) {
                 final String queue = message.body.getString("queue");
                 final String payload = message.body.getString("payload");
 
-                System.out.println("GOT " + payload + " in " + queue);
-
+                if(!counters.containsKey(queue)) {
+                    counters.put(queue, 0);
+                }
+                
+                System.out.println("GOT ["+counters.get(queue)+"] " + payload + " in " + queue);
+                
+                counters.put(queue, counters.get(queue)+1);
+                
                 if ("STOP".equals(payload)) {
                     message.reply(new JsonObject() {
                         {

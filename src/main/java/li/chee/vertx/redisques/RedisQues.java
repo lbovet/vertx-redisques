@@ -33,9 +33,10 @@ public class RedisQues extends BusModBase {
 
     // Configuration
 
-    // Address of this redisques. Also used as prefix for consumer broadcast address.
+    // Address of this redisques. Also used as prefix for consumer broadcast
+    // address.
     private String address = "redisques";
-    
+
     // Address of the redis mod
     private String redisAddress = "redis-client";
 
@@ -70,7 +71,9 @@ public class RedisQues extends BusModBase {
             command.putString("value", uid);
             eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                 public void handle(Message<JsonObject> jsonAnswer) {
-                    if (jsonAnswer.body.getBoolean("value")) {
+                    Object value = jsonAnswer.body.getField("value");
+
+                    if ((value instanceof Number && value.equals(1)) || value instanceof Boolean && (Boolean) value) {
                         // I am now the registered consumer for this queue.
                         log.debug("Now registered for queue " + queue);
                         myQueues.put(queue, QueueState.READY);
@@ -111,6 +114,7 @@ public class RedisQues extends BusModBase {
                     command.putString("command", "rpush");
                     command.putString("key", redisPrefix + queuesPrefix + queue);
                     command.putArray("values", new JsonArray(new String[] { message }));
+                    command.putString("value", message);
                     // Send it to the queue
                     eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                         public void handle(Message<JsonObject> jsonAnswer) {
@@ -152,7 +156,7 @@ public class RedisQues extends BusModBase {
         });
 
         // Handles registration requests
-        eb.registerHandler(address+"-consumers", registrationRequestHandler);
+        eb.registerHandler(address + "-consumers", registrationRequestHandler);
 
         // Handles notifications
         eb.registerHandler(uid, new Handler<Message<String>>() {
@@ -207,7 +211,7 @@ public class RedisQues extends BusModBase {
 
     private void gracefulStop(final Handler<Void> doneHandler) {
         final EventBus eb = vertx.eventBus();
-        eb.unregisterHandler(address+"-consumers", registrationRequestHandler, new AsyncResultHandler<Void>() {
+        eb.unregisterHandler(address + "-consumers", registrationRequestHandler, new AsyncResultHandler<Void>() {
             public void handle(AsyncResult<Void> event) {
                 eb.unregisterHandler(uid, new Handler<Message<Void>>() {
                     public void handle(Message<Void> message) {
@@ -316,6 +320,7 @@ public class RedisQues extends BusModBase {
                             // Get the next message only once the previous has
                             // been completely processed
                             if (state != QueueState.CONSUMING) {
+                                myQueues.put(queue, QueueState.CONSUMING);
                                 if (state == null) {
                                     // No previous state was stored. Maybe the
                                     // consumer was restarted
@@ -349,51 +354,49 @@ public class RedisQues extends BusModBase {
         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
             public void handle(Message<JsonObject> answer) {
                 if (answer.body.getString("value") != null) {
-                    if (myQueues.get(queue) != QueueState.CONSUMING) {
-                        myQueues.put(queue, QueueState.CONSUMING);
-                        processMessage(queue, answer.body.getString("value"), new Handler<Boolean>() {
-                            public void handle(Boolean success) {
-                                if (success) {
-                                    // Remove the processed message from the
-                                    // queue
-                                    JsonObject command = new JsonObject();
-                                    command.putString("command", "lpop");
-                                    command.putString("key", redisPrefix + queuesPrefix + queue);
-                                    eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
-                                        public void handle(Message<JsonObject> jsonAnswer) {
-                                            log.debug("Message removed, queue " + queue + " is ready again");
-                                            myQueues.put(queue, QueueState.READY);
-                                            // Notify that we are stopped in
-                                            // case it
-                                            // was the last active consumer
-                                            if (stoppedHandler != null) {
-                                                unregisterConsumers(false);
-                                                if (myQueues.isEmpty()) {
-                                                    stoppedHandler.handle(null);
+                    processMessage(queue, answer.body.getString("value"), new Handler<Boolean>() {
+                        public void handle(Boolean success) {
+                            if (success) {
+                                // Remove the processed message from the
+                                // queue
+                                JsonObject command = new JsonObject();
+                                command.putString("command", "lpop");
+                                command.putString("key", redisPrefix + queuesPrefix + queue);
+                                eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
+                                    public void handle(Message<JsonObject> jsonAnswer) {
+                                        log.debug("Message removed, queue " + queue + " is ready again");
+                                        myQueues.put(queue, QueueState.READY);
+                                        // Notify that we are stopped in
+                                        // case it
+                                        // was the last active consumer
+                                        if (stoppedHandler != null) {
+                                            unregisterConsumers(false);
+                                            if (myQueues.isEmpty()) {
+                                                stoppedHandler.handle(null);
+                                            }
+                                        }
+                                        // Issue notification to consume
+                                        // next
+                                        // message if any
+                                        JsonObject command = new JsonObject();
+                                        command.putString("command", "llen");
+                                        command.putString("key", redisPrefix + queuesPrefix + queue);
+                                        eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
+                                            public void handle(Message<JsonObject> answer) {
+                                                if (answer.body.getNumber("value").intValue() > 0) {
+                                                    notifyConsumer(queue);
                                                 }
                                             }
-                                            // Issue notification to consume
-                                            // next
-                                            // message if any
-                                            JsonObject command = new JsonObject();
-                                            command.putString("command", "llen");
-                                            command.putString("key", redisPrefix + queuesPrefix + queue);
-                                            eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
-                                                public void handle(Message<JsonObject> answer) {
-                                                    if (answer.body.getNumber("value").intValue() > 0) {
-                                                        notifyConsumer(queue);
-                                                    }
-                                                }
-                                            });
-                                        }
-                                    });
-                                } else {
-                                    // Failed. Message will be kept in queue and retried at next wakeup.
-                                    log.debug("Processing failed for queue "+queue);
-                                }
+                                        });
+                                    }
+                                });
+                            } else {
+                                // Failed. Message will be kept in queue and
+                                // retried at next wakeup.
+                                log.debug("Processing failed for queue " + queue);
                             }
-                        });
-                    }
+                        }
+                    });
                 } else {
                     // There was nothing in the queue, weird.
                     log.warn("Got a request to consume from empty queue " + queue);
@@ -429,7 +432,7 @@ public class RedisQues extends BusModBase {
                     // No consumer for this queue, let's make a peer become
                     // consumer
                     log.debug("Sending registration request for queue " + queue);
-                    eb.send(address+"-consumers", queue);
+                    eb.send(address + "-consumers", queue);
                 } else {
                     // Notify the registered consumer
                     log.debug("Notifying consumer " + consumer + " to consume queue " + queue);
