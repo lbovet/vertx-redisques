@@ -394,6 +394,7 @@ public class RedisQues extends BusModBase {
                                 // Failed. Message will be kept in queue and
                                 // retried at next wakeup.
                                 log.debug("Processing failed for queue " + queue);
+                                myQueues.put(queue, QueueState.READY);
                             }
                         }
                     });
