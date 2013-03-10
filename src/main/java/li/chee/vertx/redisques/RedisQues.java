@@ -271,6 +271,7 @@ public class RedisQues extends BusModBase {
                 JsonObject command = new JsonObject();
                 command.putString("command", "del");
                 command.putArray("keys", event.body.getArray("value"));
+                command.putArray("key", event.body.getArray("value"));
                 eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                     public void handle(Message<JsonObject> event) {
                         wakeConsumers();
