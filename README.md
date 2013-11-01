@@ -32,3 +32,7 @@ and does not work with vertx 1.3.
 RedisQues 0.3 is built for vertx 1.3 and thus requires a "de.marx-labs.redis-client" compatible with vertx 1.3. 
 Until it is officially provided, here is a fork that works with vertx 1.3: https://github.com/lbovet/vert.x-busmod-redis, 
 you will need to build it by yourself, though.
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/lbovet/vertx-redisques/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
