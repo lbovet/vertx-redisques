@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import org.vertx.java.busmods.BusModBase;
 import org.vertx.java.core.AsyncResult;
 import org.vertx.java.core.AsyncResultHandler;
 import org.vertx.java.core.Handler;
@@ -13,8 +12,9 @@ import org.vertx.java.core.eventbus.Message;
 import org.vertx.java.core.json.JsonArray;
 import org.vertx.java.core.json.JsonObject;
 import org.vertx.java.core.logging.Logger;
+import org.vertx.java.platform.Verticle;
 
-public class RedisQues extends BusModBase {
+public class RedisQues extends Verticle {
 
     // State of each queue. Consuming means there is a message being processed.
     private enum QueueState {
@@ -62,18 +62,16 @@ public class RedisQues extends BusModBase {
 
         public void handle(Message<String> event) {
             final EventBus eb = vertx.eventBus();
-            final String queue = event.body;
+            final String queue = event.body();
             log.debug("Got registration request for queue " + queue);
             // Try to register for this queue
             JsonObject command = new JsonObject();
             command.putString("command", "setnx");
-            command.putString("key", redisPrefix + consumersPrefix + queue);
-            command.putString("value", uid);
+            command.putArray("args", new JsonArray().add(redisPrefix + consumersPrefix + queue).add(uid));
             eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                 public void handle(Message<JsonObject> jsonAnswer) {
-                    Object value = jsonAnswer.body.getField("value");
-
-                    if ((value instanceof Number && value.equals(1)) || value instanceof Boolean && (Boolean) value) {
+                    long value = jsonAnswer.body().getLong("value");
+                    if (value == 1L) {
                         // I am now the registered consumer for this queue.
                         log.debug("Now registered for queue " + queue);
                         myQueues.put(queue, QueueState.READY);
@@ -90,11 +88,11 @@ public class RedisQues extends BusModBase {
 
     @Override
     public void start() {
-        log = container.getLogger();
+        log = container.logger();
         final EventBus eb = vertx.eventBus();
         log.info("Started with UID " + uid);
 
-        JsonObject config = container.getConfig();
+        JsonObject config = container.config();
 
         address = config.getString("address") != null ? config.getString("address") : address;
         redisAddress = config.getString("redis-address") != null ? config.getString("redis-address") : redisAddress;
@@ -105,25 +103,23 @@ public class RedisQues extends BusModBase {
         // Handles operations
         eb.registerHandler(address, new Handler<Message<JsonObject>>() {
             public void handle(final Message<JsonObject> event) {
-                String operation = event.body.getString("operation");
+                String operation = event.body().getString("operation");
                 switch (operation) {
                 case "enqueue":
-                    final String queue = event.body.getString("queue");
-                    final String message = event.body.getString("message");
+                    final String queue = event.body().getString("queue");
+                    final String message = event.body().getString("message");
                     JsonObject command = new JsonObject();
                     command.putString("command", "rpush");
-                    command.putString("key", redisPrefix + queuesPrefix + queue);
-                    command.putArray("values", new JsonArray(new String[] { message }));
-                    command.putString("value", message);
+                    command.putArray("args", new JsonArray().add(redisPrefix + queuesPrefix + queue).add(message));
                     // Send it to the queue
                     eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                         public void handle(Message<JsonObject> jsonAnswer) {
-                            Map<String, Object> answer = jsonAnswer.body.toMap();
+                            Map<String, Object> answer = jsonAnswer.body().toMap();
                             JsonObject reply = new JsonObject();
                             if (!"ok".equals(answer.get("status"))) {
-                                log.error("Error while enqueing message into queue " + queue + " : " + jsonAnswer.body.getString("message"));
+                                log.error("Error while enqueing message into queue " + queue + " : " + jsonAnswer.body().getString("message"));
                                 reply.putString("status", "error");
-                                reply.putString("message", jsonAnswer.body.getString("message"));
+                                reply.putString("message", jsonAnswer.body().getString("message"));
                                 event.reply(reply);
                             } else {
                                 log.debug("Enqueued message into queue " + queue);
@@ -161,7 +157,7 @@ public class RedisQues extends BusModBase {
         // Handles notifications
         eb.registerHandler(uid, new Handler<Message<String>>() {
             public void handle(Message<String> event) {
-                final String queue = event.body;
+                final String queue = event.body();
                 log.debug("Got notification for queue " + queue);
                 consume(queue);
             }
@@ -176,11 +172,11 @@ public class RedisQues extends BusModBase {
                         // Check if I am still the registered consumer
                         JsonObject command = new JsonObject();
                         command.putString("command", "get");
-                        command.putString("key", redisPrefix + consumersPrefix + queue);
+                        command.putArray("args", new JsonArray().add(redisPrefix + consumersPrefix + queue));
                         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                             @Override
                             public void handle(Message<JsonObject> event) {
-                                String consumer = event.body.getString("value");
+                                String consumer = event.body().getString("value");
                                 if (uid.equals(consumer)) {
                                     log.debug("Periodic consumer refresh for active queue " + queue);
                                     refreshRegistration(queue, null);
@@ -205,7 +201,7 @@ public class RedisQues extends BusModBase {
     }
 
     @Override
-    public void stop() throws Exception {
+    public void stop() {
         unregisterConsumers(true);
     }
 
@@ -237,14 +233,14 @@ public class RedisQues extends BusModBase {
                         // Make sure that I am still the registered consumer
                         JsonObject command = new JsonObject();
                         command.putString("command", "get");
-                        command.putString("key", redisPrefix + consumersPrefix + queue);
+                        command.putArray("args", new JsonArray().add(redisPrefix + consumersPrefix + queue));
                         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                             public void handle(Message<JsonObject> event) {
-                                String consumer = event.body.getString("value");
+                                String consumer = event.body().getString("value");
                                 if (uid.equals(consumer)) {
                                     JsonObject command = new JsonObject();
                                     command.putString("command", "del");
-                                    command.putString("key", consumersPrefix + queue);
+                                    command.putArray("args", new JsonArray().add(consumersPrefix + queue));
                                     myQueues.remove(queue);
                                 }
                             }
@@ -264,14 +260,13 @@ public class RedisQues extends BusModBase {
         final EventBus eb = vertx.eventBus();
         JsonObject command = new JsonObject();
         command.putString("command", "keys");
-        command.putString("pattern", redisPrefix + consumersPrefix + "*");
+        command.putArray("args", new JsonArray().add(redisPrefix + consumersPrefix + "*"));
         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
             @Override
             public void handle(Message<JsonObject> event) {
                 JsonObject command = new JsonObject();
                 command.putString("command", "del");
-                command.putArray("keys", event.body.getArray("value"));
-                command.putArray("key", event.body.getArray("value"));
+                command.putArray("args", event.body().getArray("value"));
                 eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                     public void handle(Message<JsonObject> event) {
                         wakeConsumers();
@@ -288,11 +283,11 @@ public class RedisQues extends BusModBase {
         final EventBus eb = vertx.eventBus();
         JsonObject command = new JsonObject();
         command.putString("command", "keys");
-        command.putString("pattern", redisPrefix + queuesPrefix + "*");
+        command.putArray("args", new JsonArray().add(redisPrefix + queuesPrefix + "*"));
         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
             @Override
             public void handle(Message<JsonObject> event) {
-                JsonArray list = event.body.getArray("value");
+                JsonArray list = event.body().getArray("value");
                 if (list.size() > 0) {
                     log.debug("Waking up consumers for " + list.size() + " queue(s)");
                 }
@@ -312,10 +307,10 @@ public class RedisQues extends BusModBase {
                 // Make sure that I am still the registered consumer
                 JsonObject command = new JsonObject();
                 command.putString("command", "get");
-                command.putString("key", redisPrefix + consumersPrefix + queue);
+                command.putArray("args", new JsonArray().add(redisPrefix + consumersPrefix + queue));
                 eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                     public void handle(Message<JsonObject> event) {
-                        String consumer = event.body.getString("value");
+                        String consumer = event.body().getString("value");
                         if (uid.equals(consumer)) {
                             QueueState state = myQueues.get(queue);
                             // Get the next message only once the previous has
@@ -350,19 +345,18 @@ public class RedisQues extends BusModBase {
         final EventBus eb = vertx.eventBus();
         JsonObject command = new JsonObject();
         command.putString("command", "lindex");
-        command.putString("key", redisPrefix + queuesPrefix + queue);
-        command.putNumber("index", 0);
+        command.putArray("args", new JsonArray().add(redisPrefix + queuesPrefix + queue).add(0));
         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
             public void handle(Message<JsonObject> answer) {
-                if (answer.body.getString("value") != null) {
-                    processMessage(queue, answer.body.getString("value"), new Handler<Boolean>() {
+                if (answer.body().getString("value") != null) {
+                    processMessage(queue, answer.body().getString("value"), new Handler<Boolean>() {
                         public void handle(Boolean success) {
                             if (success) {
                                 // Remove the processed message from the
                                 // queue
                                 JsonObject command = new JsonObject();
                                 command.putString("command", "lpop");
-                                command.putString("key", redisPrefix + queuesPrefix + queue);
+                                command.putArray("args", new JsonArray().add(redisPrefix + queuesPrefix + queue));
                                 eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                                     public void handle(Message<JsonObject> jsonAnswer) {
                                         log.debug("Message removed, queue " + queue + " is ready again");
@@ -381,10 +375,10 @@ public class RedisQues extends BusModBase {
                                         // message if any
                                         JsonObject command = new JsonObject();
                                         command.putString("command", "llen");
-                                        command.putString("key", redisPrefix + queuesPrefix + queue);
+                                        command.putArray("args", new JsonArray().add(redisPrefix + queuesPrefix + queue));
                                         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
                                             public void handle(Message<JsonObject> answer) {
-                                                if (answer.body.getNumber("value").intValue() > 0) {
+                                                if (answer.body().getNumber("value").intValue() > 0) {
                                                     notifyConsumer(queue);
                                                 }
                                             }
@@ -414,7 +408,7 @@ public class RedisQues extends BusModBase {
         message.putString("payload", payload);
         eb.send(processorAddress, message, new Handler<Message<JsonObject>>() {
             public void handle(Message<JsonObject> reply) {
-                handler.handle(reply.body.getString("status").equals("ok"));
+                handler.handle(reply.body().getString("status").equals("ok"));
             }
         });
     }
@@ -426,10 +420,10 @@ public class RedisQues extends BusModBase {
         // Find the consumer to notify
         JsonObject command = new JsonObject();
         command.putString("command", "get");
-        command.putString("key", redisPrefix + consumersPrefix + queue);
+        command.putArray("args", new JsonArray().add(redisPrefix + consumersPrefix + queue));
         eb.send(redisAddress, command, new Handler<Message<JsonObject>>() {
             public void handle(Message<JsonObject> jsonAnswer) {
-                String consumer = jsonAnswer.body.getString("value");
+                String consumer = jsonAnswer.body().getString("value");
                 if (consumer == null) {
                     // No consumer for this queue, let's make a peer become
                     // consumer
@@ -448,8 +442,7 @@ public class RedisQues extends BusModBase {
         log.debug("Refreshing registration of queue " + queue);
         JsonObject command = new JsonObject();
         command.putString("command", "expire");
-        command.putString("key", redisPrefix + consumersPrefix + queue);
-        command.putNumber("seconds", 2 * refreshPeriod);
+        command.putArray("args", new JsonArray().add(redisPrefix + consumersPrefix + queue).add(2 * refreshPeriod));
         if (handler != null) {
             vertx.eventBus().send(redisAddress, command, handler);
         } else {
