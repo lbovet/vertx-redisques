@@ -1,7 +1,7 @@
 vertx-redisques
 ===============
 
-A highly scalable redis-persistent queuing system for vertx.
+A highly scalable redis-persistent queuing system for Vert.x.
 
 Dynamic Queues
 --------------
@@ -26,13 +26,8 @@ If an instance dies, its queues will be assigned to other instances.
 Dependencies
 ------------
 
-RedisQues 0.2 use the redis-client busmod "de.marx-labs.redis-client" which currently (as of version v0.3) needs vertx 1.2 
-and does not work with vertx 1.3.
-
-RedisQues 0.3 is built for vertx 1.3 and thus requires a "de.marx-labs.redis-client" compatible with vertx 1.3. 
-Until it is officially provided, here is a fork that works with vertx 1.3: https://github.com/lbovet/vert.x-busmod-redis, 
-you will need to build it by yourself, though.
-
+Module [mod-redis](https://github.com/vert-x/mod-redis) is required and used via the event bus. 
+Version 1.0 of Redisques has been tested with Vert.x 2.1M3 and io.vertx~mod-redis~1.1.3
 
 [![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/lbovet/vertx-redisques/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 
