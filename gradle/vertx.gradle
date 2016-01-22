@@ -52,15 +52,34 @@ repositories {
     // are concurrent builds
     mavenLocal()
   }
-  maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+
+  try {
+    maven { url "$repository" }
+    println "use custom repository: $repository"
+  } catch(Exception e) {
+    maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+    println 'use standard repository'
+  }
+
   mavenCentral()
 }
 
 dependencies {
-  provided "io.vertx:vertx-core:$vertxVersion"
-  provided "io.vertx:vertx-platform:$vertxVersion"
-  testCompile "junit:junit:$junitVersion"
-  testCompile "io.vertx:testtools:$toolsVersion"
+    provided "io.vertx:vertx-core:$vertxVersion"
+    provided "io.vertx:vertx-platform:$vertxVersion"
+    provided "org.springframework:spring-core:4.1.6.RELEASE"
+
+    compile 'li.chee.vertx:rest-mirror:01.00.01:mod@zip'
+
+    testCompile "junit:junit:$junitVersion"
+    testCompile "io.vertx:testtools:$toolsVersion"
+    testCompile 'com.github.kstyrc:embedded-redis:0.6'
+    testCompile 'com.jayway.restassured:rest-assured:2.4.1'
+    testCompile 'com.jayway.awaitility:awaitility-scala:1.6.3'
+    testCompile 'redis.clients:jedis:2.4.1'
+    testCompile 'io.vertx:mod-redis-client:1.1.3'
+
+    testRuntime 'com.github.kstyrc:embedded-redis:0.6'
 }
 
 // This sets up the classpath for the script itself
@@ -73,7 +92,15 @@ buildscript {
       // are concurrent builds
       mavenLocal()
     }
-    maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+
+    try {
+      maven { url "$repository" }
+      println "use custom repository: $repository"
+    } catch(Exception e) {
+      maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+      println 'use standard repository'
+    }
+
     mavenCentral()
   }
 
@@ -86,12 +113,7 @@ buildscript {
 
     // Users can be Vert.x platform classpath files (e.g. langs.properties) in either src/main/platform_lib
     // or src/main/resources/platform_lib (if they want it in the module for fatjars)
-    classpath files(['src/main/platform-lib'])
-    classpath files(['src/main/platform-lib/*.jar'])
-    classpath files(['src/main/platform-lib/*.zip'])
-    classpath files(['src/main/resources/platform-lib'])
-    classpath files(['src/main/resources/platform-lib/*.jar'])
-    classpath files(['src/main/resources/platform-lib/*.zip'])
+
   }
 }
 
@@ -123,6 +145,10 @@ task sourceJar(type: Jar) {
   description = 'Builds a source jar artifact suitable for maven deployment.'
   classifier = 'sources'
   from sourceSets.main.java
+}
+
+javadoc {
+  classpath = configurations.compile + configurations.provided
 }
 
 task javadocJar(type: Jar) {
@@ -174,10 +200,10 @@ def doInit() {
   if (!cpFile.exists()) {
     cpFile.createNewFile();
     String defaultCp =
-      "src/main/resources\r\n" +
-      "bin\r\n" +
-      "out/production/${project.name}\r\n" +
-      "out/test/${project.name}";
+            "src/main/resources\r\n" +
+                    "bin\r\n" +
+                    "out/production/${project.name}\r\n" +
+                    "out/test/${project.name}";
     cpFile << defaultCp;
   }
   def args = ['create-module-link', moduleName]
@@ -210,6 +236,7 @@ def setSysProps() {
 }
 
 def loadProperties(String sourceFileName) {
+  println "load properties $sourceFileName"
   def config = new Properties()
   def propFile = new File(sourceFileName)
   if (propFile.canRead()) {
