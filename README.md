@@ -1,7 +1,7 @@
 vertx-redisques
 ===============
 
-A highly scalable redis-persistent queuing system for Vert.x.
+A highly scalable redis-persistent queuing system for vert.x.
 
 Dynamic Queues
 --------------
