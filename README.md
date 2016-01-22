@@ -1,6 +1,8 @@
 vertx-redisques
 ===============
 
+[![Build Status](https://drone.io/github.com/swisspush/vertx-redisques/status.png)](https://drone.io/github.com/swisspush/vertx-redisques/latest)
+
 A highly scalable redis-persistent queuing system for vert.x.
 
 Dynamic Queues
