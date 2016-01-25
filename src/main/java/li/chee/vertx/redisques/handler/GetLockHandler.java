@@ -1,30 +1,32 @@
 package li.chee.vertx.redisques.handler;
 
+import io.vertx.core.AsyncResult;
 import li.chee.vertx.redisques.RedisQues;
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.eventbus.Message;
-import org.vertx.java.core.json.JsonObject;
+import io.vertx.core.Handler;
+import io.vertx.core.eventbus.Message;
+import io.vertx.core.json.JsonObject;
 
 /**
  * Class GetLockHandler.
  *
  * @author baldim
  */
-public class GetLockHandler implements Handler<Message<JsonObject>> {
+public class GetLockHandler implements Handler<AsyncResult<String>> {
     private Message<JsonObject> event;
 
     public GetLockHandler(Message<JsonObject> event) {
         this.event = event;
     }
 
-    public void handle(Message<JsonObject> reply) {
-        if (reply.body().getString(RedisQues.VALUE) != null) {
+    @Override
+    public void handle(AsyncResult<String> reply) {
+        if (reply.result() != null) {
             event.reply(new JsonObject()
-                    .putString(RedisQues.STATUS, RedisQues.OK)
-                    .putString(RedisQues.VALUE, reply.body().getString(RedisQues.VALUE))
+                    .put(RedisQues.STATUS, RedisQues.OK)
+                    .put(RedisQues.VALUE, reply.result())
             );
         } else {
-            event.reply(new JsonObject().putString(RedisQues.STATUS, "No such lock"));
+            event.reply(new JsonObject().put(RedisQues.STATUS, "No such lock"));
         }
     }
 }

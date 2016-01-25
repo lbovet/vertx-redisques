@@ -288,9 +288,7 @@ Response Data
 
 Dependencies
 ------------
-
-Module [mod-redis](https://github.com/vert-x/mod-redis) is required and used via the event bus. 
-Version 1.0 of Redisques has been tested with Vert.x 2.1M3 and io.vertx~mod-redis~1.1.3
+Redisques versions greater than 01.00.17 depend on Vert.x v3.2.0 and therefore require Java 8.
 
 Use gradle with alternative repositories
 ----------------------------------------
