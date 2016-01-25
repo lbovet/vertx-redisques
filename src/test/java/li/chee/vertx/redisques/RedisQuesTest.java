@@ -47,6 +47,7 @@ public class RedisQuesTest extends AbstractTestCase {
     public void enqueue(TestContext context) {
         Async async = context.async();
         flushAll();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
         eventBusSend(enqueueOperation("queueEnqueue", "helloEnqueue"), message -> {
             context.assertEquals(OK, message.result().body().getString(STATUS));
             context.assertEquals("helloEnqueue", jedis.lindex("redisques:queues:queueEnqueue", 0));

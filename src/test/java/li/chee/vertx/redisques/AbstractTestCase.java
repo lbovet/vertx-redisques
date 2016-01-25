@@ -114,8 +114,6 @@ public abstract class AbstractTestCase {
                     counters.put(queue, 0);
                 }
 
-                log.info("GOT ["+counters.get(queue)+"] " + payload + " in " + queue+".");
-
                 counters.put(queue, counters.get(queue)+1);
 
                 if ("STOP".equals(payload)) {
@@ -138,7 +136,6 @@ public abstract class AbstractTestCase {
                     signature.update(payload.getBytes());
                 }
 
-                log.info("Processing message " + payload);
                 vertx.setTimer(new Random().nextLong() % 1 + 1, event -> {
                     log.debug("Processed message " + payload);
                     message.reply(new JsonObject() {
@@ -226,7 +223,6 @@ public abstract class AbstractTestCase {
                 } else {
                     message = m;
                 }
-                log.info("SENDING [" + messageCount + "] " + message + " to " + queue+".");
                 signature.update(message.getBytes());
                 JsonObject operation = buildOperation(Operation.enqueue, new JsonObject().put(QUEUENAME, queue));
                 operation.put(MESSAGE, message);
