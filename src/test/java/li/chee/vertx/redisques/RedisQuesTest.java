@@ -12,7 +12,7 @@ import org.junit.Test;
 /**
  * Class RedisQueueBrowserTest.
  *
- * @author baldim
+ * @author baldim, webermarca
  */
 public class RedisQuesTest extends AbstractTestCase {
 
@@ -103,6 +103,27 @@ public class RedisQuesTest extends AbstractTestCase {
             assertKeyCount(context, QUEUES_PREFIX, 1);
             context.assertEquals("fooBar", jedis.lindex(QUEUES_PREFIX + "queue2", 0));
             async.complete();
+        });
+    }
+
+    @Test
+    public void getListRangeWithQueueSizeInformation(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        eventBusSend(buildOperation(Operation.addItem, new JsonObject().put(QUEUENAME, "queue2").put(BUFFER, "fooBar")), message -> {
+            eventBusSend(buildOperation(Operation.addItem, new JsonObject().put(QUEUENAME, "queue2").put(BUFFER, "fooBar2")), message1 -> {
+                eventBusSend(buildOperation(Operation.addItem, new JsonObject().put(QUEUENAME, "queue2").put(BUFFER, "fooBar3")), message2 -> {
+                    context.assertEquals(OK, message2.result().body().getString(STATUS));
+                    eventBusSend(buildOperation(Operation.getListRange, new JsonObject().put(QUEUENAME, "queue2").put(LIMIT, "2")), event -> {
+                        context.assertEquals(OK, event.result().body().getString(STATUS));
+                        context.assertEquals(2, event.result().body().getJsonArray(VALUE).size());
+                        context.assertEquals(2, event.result().body().getJsonArray(INFO).getInteger(0));
+                        context.assertEquals(3, event.result().body().getJsonArray(INFO).getInteger(1));
+                        async.complete();
+                    });
+                });
+            });
         });
     }
 

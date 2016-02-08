@@ -67,6 +67,7 @@ public class RedisQues extends AbstractVerticle {
     public static final String STATUS = "status";
     public static final String MESSAGE = "message";
     public static final String VALUE = "value";
+    public static final String INFO = "info";
     public static final String OK = "ok";
     public static final String ERROR = "error";
     public static final String PAYLOAD = "payload";
@@ -174,7 +175,9 @@ public class RedisQues extends AbstractVerticle {
                     case "getListRange":
                         String keyListRange = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME);
                         int maxQueueItemCountIndex = getMaxQueueItemCountIndex(event.body().getJsonObject(PAYLOAD).getString(LIMIT));
-                        redisClient.lrange(keyListRange, 0, maxQueueItemCountIndex, new GetListRangeHandler(event));
+                        redisClient.llen(keyListRange, countReply -> {
+                            redisClient.lrange(keyListRange, 0, maxQueueItemCountIndex, new GetListRangeHandler(event, countReply.result()));
+                        });
                         break;
                     case "addItem":
                         String key1 = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME);

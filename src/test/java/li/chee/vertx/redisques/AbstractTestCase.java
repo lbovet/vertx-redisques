@@ -33,6 +33,7 @@ public abstract class AbstractTestCase {
     public static final String OK = "ok";
     public static final String ERROR = "error";
     public static final String VALUE = "value";
+    public static final String INFO = "info";
     public static final String STATUS = "status";
     public static final String INDEX = "index";
     public static final String BUFFER = "buffer";
@@ -41,6 +42,7 @@ public abstract class AbstractTestCase {
     public static final String REQUESTEDBY = "requestedBy";
     public static final String TIMESTAMP = "timestamp";
     public static final String QUEUENAME = "queuename";
+    public static final String LIMIT = "limit";
     public static final String QUEUES_PREFIX = "redisques:queues:";
     public static final String REDISQUES_LOCKS = "redisques:locks";
 

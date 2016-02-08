@@ -10,19 +10,25 @@ import io.vertx.core.json.JsonObject;
 /**
  * Class GetListRangeHandler.
  *
- * @author baldim
+ * @author baldim, webermarca
  */
 public class GetListRangeHandler implements Handler<AsyncResult<JsonArray>> {
     private Message<JsonObject> event;
+    private Long queueItemCount;
 
-    public GetListRangeHandler(Message<JsonObject> event) {
+    public GetListRangeHandler(Message<JsonObject> event, Long queueItemCount) {
         this.event = event;
+        this.queueItemCount = queueItemCount;
     }
 
     @Override
     public void handle(AsyncResult<JsonArray> reply) {
         if(reply.succeeded()){
-            event.reply(new JsonObject().put(RedisQues.STATUS, RedisQues.OK).put(RedisQues.VALUE, reply.result()));
+            JsonArray resultArray = reply.result();
+            JsonArray countInfo = new JsonArray();
+            countInfo.add(resultArray.size());
+            countInfo.add(queueItemCount);
+            event.reply(new JsonObject().put(RedisQues.STATUS, RedisQues.OK).put(RedisQues.VALUE, resultArray).put(RedisQues.INFO, countInfo));
         } else {
             event.reply(new JsonObject().put(RedisQues.STATUS, RedisQues.ERROR));
         }
