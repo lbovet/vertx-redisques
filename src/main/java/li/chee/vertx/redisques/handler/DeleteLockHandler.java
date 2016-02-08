@@ -1,30 +1,32 @@
 package li.chee.vertx.redisques.handler;
 
+import io.vertx.core.AsyncResult;
 import li.chee.vertx.redisques.RedisQues;
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.eventbus.Message;
-import org.vertx.java.core.json.JsonObject;
+import io.vertx.core.Handler;
+import io.vertx.core.eventbus.Message;
+import io.vertx.core.json.JsonObject;
 
 /**
  * Class DeleteLockHandler.
  *
  * @author baldim
  */
-public class DeleteLockHandler implements Handler<Message<JsonObject>> {
+public class DeleteLockHandler implements Handler<AsyncResult<Long>> {
     private Message<JsonObject> event;
 
     public DeleteLockHandler(Message<JsonObject> event) {
         this.event = event;
     }
 
-    public void handle(Message<JsonObject> reply) {
-        if (RedisQues.OK.equals(reply.body().getString(RedisQues.STATUS))) {
+    @Override
+    public void handle(AsyncResult<Long> reply) {
+        if (reply.succeeded()) {
             event.reply(new JsonObject()
-                            .putString(RedisQues.STATUS, RedisQues.OK)
+                    .put(RedisQues.STATUS, RedisQues.OK)
             );
         } else {
             event.reply(new JsonObject()
-                            .putString(RedisQues.STATUS, RedisQues.ERROR)
+                    .put(RedisQues.STATUS, RedisQues.ERROR)
             );
         }
     }

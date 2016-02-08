@@ -1,31 +1,29 @@
 package li.chee.vertx.redisques.handler;
 
+import io.vertx.core.AsyncResult;
 import li.chee.vertx.redisques.RedisQues;
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.eventbus.Message;
-import org.vertx.java.core.json.JsonObject;
+import io.vertx.core.Handler;
+import io.vertx.core.eventbus.Message;
+import io.vertx.core.json.JsonObject;
 
 /**
  * Class PutLock.
  *
  * @author baldim
  */
-public class PutLockHandler implements Handler<Message<JsonObject>> {
+public class PutLockHandler implements Handler<AsyncResult<String>> {
     private Message<JsonObject> event;
 
     public PutLockHandler(Message<JsonObject> event) {
         this.event = event;
     }
 
-    public void handle(Message<JsonObject> reply) {
-        if (RedisQues.OK.equals(reply.body().getString(RedisQues.STATUS))) {
-            event.reply(new JsonObject()
-                            .putString(RedisQues.STATUS, RedisQues.OK)
-            );
+    @Override
+    public void handle(AsyncResult<String> reply) {
+        if(reply.succeeded()){
+            event.reply(new JsonObject().put(RedisQues.STATUS, RedisQues.OK));
         } else {
-            event.reply(new JsonObject()
-                            .putString(RedisQues.STATUS, RedisQues.ERROR)
-            );
+            event.reply(new JsonObject().put(RedisQues.STATUS, RedisQues.ERROR));
         }
     }
 }

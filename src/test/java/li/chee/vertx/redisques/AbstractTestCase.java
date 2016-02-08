@@ -1,31 +1,39 @@
 package li.chee.vertx.redisques;
 
+import io.vertx.core.AsyncResult;
+import io.vertx.core.DeploymentOptions;
+import io.vertx.core.Handler;
+import io.vertx.core.Vertx;
+import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.eventbus.Message;
+import io.vertx.core.json.JsonObject;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+import io.vertx.ext.unit.Async;
+import io.vertx.ext.unit.TestContext;
+import io.vertx.ext.unit.junit.VertxUnitRunner;
+import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
-import org.vertx.java.core.AsyncResult;
-import org.vertx.java.core.AsyncResultHandler;
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.eventbus.EventBus;
-import org.vertx.java.core.eventbus.Message;
-import org.vertx.java.core.json.JsonObject;
-import org.vertx.java.core.logging.Logger;
-import org.vertx.testtools.TestVerticle;
-import org.vertx.testtools.VertxAssert;
+import org.junit.runner.RunWith;
 import redis.clients.jedis.Jedis;
 
 import javax.xml.bind.DatatypeConverter;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
 
-import static org.vertx.testtools.VertxAssert.assertEquals;
-import static org.vertx.testtools.VertxAssert.testComplete;
-
-public abstract class AbstractTestCase extends TestVerticle {
+@RunWith(VertxUnitRunner.class)
+public abstract class AbstractTestCase {
 
     public static final int NUM_QUEUES = 15;
     public static final String OK = "ok";
     public static final String ERROR = "error";
     public static final String VALUE = "value";
+    public static final String INFO = "info";
     public static final String STATUS = "status";
     public static final String INDEX = "index";
     public static final String BUFFER = "buffer";
@@ -34,20 +42,16 @@ public abstract class AbstractTestCase extends TestVerticle {
     public static final String REQUESTEDBY = "requestedBy";
     public static final String TIMESTAMP = "timestamp";
     public static final String QUEUENAME = "queuename";
+    public static final String LIMIT = "limit";
     public static final String QUEUES_PREFIX = "redisques:queues:";
     public static final String REDISQUES_LOCKS = "redisques:locks";
 
-    public EventBus eb;
-    Logger log = null;
-    private static final String address = "redis-client";
+    Vertx vertx;
+    Logger log = LoggerFactory.getLogger(AbstractTestCase.class);
     protected Jedis jedis;
 
     public enum Operation{
         addItem, deleteItem, deleteLock, getAllLocks, getItem, getLock, enqueue, getListRange, deleteAllQueueItems, putLock, replaceItem
-    }
-
-    private void appReady() {
-        super.start();
     }
 
     protected void flushAll(){
@@ -56,12 +60,12 @@ public abstract class AbstractTestCase extends TestVerticle {
         }
     }
 
-    protected void assertKeyCount(int keyCount){
-        assertKeyCount("", keyCount);
+    protected void assertKeyCount(TestContext context, int keyCount){
+        assertKeyCount(context, "", keyCount);
     }
 
-    protected void assertKeyCount(String prefix, int keyCount){
-        assertEquals(keyCount, jedis.keys(prefix+"*").size());
+    protected void assertKeyCount(TestContext context, String prefix, int keyCount){
+        context.assertEquals(keyCount, jedis.keys(prefix+"*").size());
     }
 
     @BeforeClass
@@ -78,70 +82,103 @@ public abstract class AbstractTestCase extends TestVerticle {
         }
     }
 
-    @Override
-    public void start() {
-        log = container.logger();
-        VertxAssert.initialize(vertx);
-        eb = vertx.eventBus();
+    @Before
+    public void setUp(TestContext context) {
+        vertx = Vertx.vertx();
 
-        JsonObject redisConfig = new JsonObject();
-        redisConfig.putString("address", address);
-        redisConfig.putString("host", "localhost");
-        redisConfig.putNumber("port", 6379);
-        redisConfig.putString("encoding", "ISO-8859-1");
-        container.deployModule("io.vertx~mod-redis~1.1.3", redisConfig,1, new AsyncResultHandler<String>() {
-            public void handle(AsyncResult<String> event) {
-                log.info("vert.x Deploy - io.vertx~mod-redis~1.1.3 successful: " + event.succeeded());
-                JsonObject redisquesConfig = new JsonObject();
-                redisquesConfig.putString("redis-address", address);
-                redisquesConfig.putString("processor-address", "processor-address");
-                container.deployModule(System.getProperty("vertx.modulename"), redisquesConfig,1, new AsyncResultHandler<String>() {
-                    @Override
-                    public void handle(AsyncResult<String> event) {
-                        if (event.failed()) {
-                            log.error("Could not load main redis module", event.cause());
-                            return;
+        JsonObject redisquesConfig = new JsonObject();
+        redisquesConfig.put("redisHost", "localhost");
+        redisquesConfig.put("redisPort", 6379);
+        redisquesConfig.put("redisEncoding", "ISO-8859-1");
+        redisquesConfig.put("processor-address", "processor-address");
+
+        String moduleName = "li.chee.vertx.redisques.RedisQues";
+
+        vertx.deployVerticle(moduleName, new DeploymentOptions().setConfig(redisquesConfig), context.asyncAssertSuccess(event -> {
+            log.info("vert.x Deploy - " + moduleName + " was successful.");
+            jedis = new Jedis("localhost", 6379, 5000);
+            flushAll();
+            initProcessor(vertx.eventBus());
+        }));
+    }
+
+    private void initProcessor(EventBus eventBus){
+
+        final Map<String, Integer> counters = new HashMap<>();
+        final Map<String, MessageDigest> signatures = new HashMap<>();
+
+        eventBus.consumer("processor-address", new Handler<Message<JsonObject>>() {
+            public void handle(final Message<JsonObject> message) {
+                final String queue = message.body().getString("queue");
+                final String payload = message.body().getString("payload");
+
+                if(!counters.containsKey(queue)) {
+                    counters.put(queue, 0);
+                }
+
+                counters.put(queue, counters.get(queue)+1);
+
+                if ("STOP".equals(payload)) {
+                    message.reply(new JsonObject() {
+                        {
+                            put("status", "ok");
                         }
-                        log.info("vert.x Deploy - " + System.getProperty("vertx.modulename") + " successful: " + event.succeeded());
-                        jedis = new Jedis("localhost", 6379, 5000);
-                        flushAll();
-                        appReady();
+                    });
+                    eventBus.send("digest-" + queue, DatatypeConverter.printBase64Binary(signatures.get(queue).digest()));
+                } else {
+                    MessageDigest signature = signatures.get(queue);
+                    if (signature == null) {
+                        try {
+                            signature = MessageDigest.getInstance("MD5");
+                            signatures.put(queue, signature);
+                        } catch (NoSuchAlgorithmException e) {
+                            throw new RuntimeException();
+                        }
                     }
+                    signature.update(payload.getBytes());
+                }
+
+                vertx.setTimer(new Random().nextLong() % 1 + 1, event -> {
+                    log.debug("Processed message " + payload);
+                    message.reply(new JsonObject() {
+                        {
+                            put("status", "ok");
+                        }
+                    });
                 });
             }
         });
     }
 
+    @After
+    public void tearDown() {
+        flushAll();
+        jedis.close();
+    }
+
     public JsonObject enqueueOperation(String queueName, String message){
         JsonObject operation = buildOperation(Operation.enqueue);
-        operation.putObject(PAYLOAD, new JsonObject().putString(QUEUENAME, queueName));
-        operation.putString(MESSAGE, message);
+        operation.put(PAYLOAD, new JsonObject().put(QUEUENAME, queueName));
+        operation.put(MESSAGE, message);
         return operation;
     }
 
     public JsonObject putLockOperation(String queueName, String requestedBy){
         JsonObject operation = buildOperation(Operation.putLock);
-        operation.putObject(PAYLOAD, new JsonObject().putString(QUEUENAME, queueName).putString(REQUESTEDBY, requestedBy));
+        operation.put(PAYLOAD, new JsonObject().put(QUEUENAME, queueName).put(REQUESTEDBY, requestedBy));
         return operation;
     }
 
     public JsonObject buildOperation(Operation operation){
         JsonObject op = new JsonObject();
-        op.putString("operation", operation.name());
+        op.put("operation", operation.name());
         return op;
     }
 
     public JsonObject buildOperation(Operation operation, JsonObject payload){
         JsonObject op = buildOperation(operation);
-        op.putObject(PAYLOAD, payload);
+        op.put(PAYLOAD, payload);
         return op;
-    }
-
-    @Override
-    public void stop() {
-        super.stop();
-        flushAll();
-        jedis.close();
     }
 
     int numMessages = 50;
@@ -154,8 +191,12 @@ public abstract class AbstractTestCase extends TestVerticle {
         final String queue;
         int messageCount;
         MessageDigest signature;
+        TestContext context;
+        Async async;
 
-        Sender(final String queue) {
+        Sender(TestContext context, Async async, final String queue) {
+            this.context = context;
+            this.async = async;
             this.queue = queue;
             try {
                 signature = MessageDigest.getInstance("MD5");
@@ -163,14 +204,14 @@ public abstract class AbstractTestCase extends TestVerticle {
                 throw new RuntimeException(e);
             }
 
-            eb.registerHandler("digest-" + queue, new Handler<Message<String>>() {
+            vertx.eventBus().consumer("digest-" + queue, new Handler<Message<String>>() {
                 @Override
                 public void handle(Message<String> event) {
-                    System.out.println("Received signature for " + queue + ": " + event.body());
-                    assertEquals("Signatures differ", event.body(), DatatypeConverter.printBase64Binary(signature.digest()));
+                    log.info("Received signature for " + queue + ": " + event.body());
+                    context.assertEquals(event.body(), DatatypeConverter.printBase64Binary(signature.digest()), "Signatures differ");
                     finished++;
                     if (finished == NUM_QUEUES) {
-                        testComplete();
+                        async.complete();
                     }
                 }
             });
@@ -184,27 +225,28 @@ public abstract class AbstractTestCase extends TestVerticle {
                 } else {
                     message = m;
                 }
-                System.out.println("SENDING [" + messageCount + "] " + message + " to " + queue+".");
                 signature.update(message.getBytes());
-                JsonObject operation = buildOperation(Operation.enqueue, new JsonObject().putString(QUEUENAME, queue));
-                operation.putString(MESSAGE, message);
-                eb.send("redisques", operation, new Handler<Message<JsonObject>>() {
-                    public void handle(Message<JsonObject> event) {
-                        if(event.body().getString(STATUS).equals(OK)) {
+                JsonObject operation = buildOperation(Operation.enqueue, new JsonObject().put(QUEUENAME, queue));
+                operation.put(MESSAGE, message);
+                vertx.eventBus().send("redisques", operation, new Handler<AsyncResult<Message<JsonObject>>>() {
+                    @Override
+                    public void handle(AsyncResult<Message<JsonObject>> event) {
+                        if(event.result().body().getString(STATUS).equals(OK)) {
                             send(null);
                         } else {
-                            System.out.println("ERROR sending "+message+" to "+queue);
+                            log.error("ERROR sending "+message+" to "+queue);
                             send(message);
                         }
                     }
                 });
                 messageCount++;
             } else {
-                JsonObject operation = buildOperation(Operation.enqueue, new JsonObject().putString(QUEUENAME, queue));
-                operation.putString(MESSAGE, "STOP");
-                eb.send("redisques", operation, new Handler<Message<JsonObject>>() {
-                    public void handle(Message<JsonObject> reply) {
-                        assertEquals(OK, reply.body().getString(STATUS));
+                JsonObject operation = buildOperation(Operation.enqueue, new JsonObject().put(QUEUENAME, queue));
+                operation.put(MESSAGE, "STOP");
+                vertx.eventBus().send("redisques", operation, new Handler<AsyncResult<Message<JsonObject>>>() {
+                    @Override
+                    public void handle(AsyncResult<Message<JsonObject>> reply) {
+                        context.assertEquals(OK, reply.result().body().getString(STATUS));
                     }
                 });
             }

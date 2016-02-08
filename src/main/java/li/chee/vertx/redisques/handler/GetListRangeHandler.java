@@ -1,32 +1,36 @@
 package li.chee.vertx.redisques.handler;
 
+import io.vertx.core.AsyncResult;
+import io.vertx.core.json.JsonArray;
 import li.chee.vertx.redisques.RedisQues;
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.eventbus.Message;
-import org.vertx.java.core.json.JsonObject;
+import io.vertx.core.Handler;
+import io.vertx.core.eventbus.Message;
+import io.vertx.core.json.JsonObject;
 
 /**
  * Class GetListRangeHandler.
  *
- * @author baldim
+ * @author baldim, webermarca
  */
-public class GetListRangeHandler implements Handler<Message<JsonObject>> {
+public class GetListRangeHandler implements Handler<AsyncResult<JsonArray>> {
     private Message<JsonObject> event;
+    private Long queueItemCount;
 
-    public GetListRangeHandler(Message<JsonObject> event) {
+    public GetListRangeHandler(Message<JsonObject> event, Long queueItemCount) {
         this.event = event;
+        this.queueItemCount = queueItemCount;
     }
 
-    public void handle(Message<JsonObject> reply) {
-        if (RedisQues.OK.equals(reply.body().getString(RedisQues.STATUS))) {
-            event.reply(new JsonObject()
-                            .putString(RedisQues.STATUS, RedisQues.OK)
-                            .putArray(RedisQues.VALUE, reply.body().getArray(RedisQues.VALUE))
-            );
+    @Override
+    public void handle(AsyncResult<JsonArray> reply) {
+        if(reply.succeeded()){
+            JsonArray resultArray = reply.result();
+            JsonArray countInfo = new JsonArray();
+            countInfo.add(resultArray.size());
+            countInfo.add(queueItemCount);
+            event.reply(new JsonObject().put(RedisQues.STATUS, RedisQues.OK).put(RedisQues.VALUE, resultArray).put(RedisQues.INFO, countInfo));
         } else {
-            event.reply(new JsonObject()
-                            .putString(RedisQues.STATUS, RedisQues.ERROR)
-            );
+            event.reply(new JsonObject().put(RedisQues.STATUS, RedisQues.ERROR));
         }
     }
 }
