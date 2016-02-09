@@ -57,6 +57,7 @@ public class RedisQuesTest extends AbstractTestCase {
         });
     }
 
+    @Ignore
     @Test
     public void getListRange(TestContext context) {
         Async async = context.async();
