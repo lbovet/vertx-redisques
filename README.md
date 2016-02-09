@@ -125,7 +125,7 @@ Response Data
 	{
 		"status": "ok" / "error",
 		"value": <objArr RESULT>,
-		"info": <nbrArray with result array (value property) size and total queue item count (can be greater than limit)>
+		"info": <nbrArray with result array (value property) size and total queue item count (can be greater than limit) >
 	}
 
 ### addItem ###
