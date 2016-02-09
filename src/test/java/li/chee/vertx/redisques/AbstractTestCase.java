@@ -97,7 +97,6 @@ public abstract class AbstractTestCase {
         vertx.deployVerticle(moduleName, new DeploymentOptions().setConfig(redisquesConfig), context.asyncAssertSuccess(event -> {
             log.info("vert.x Deploy - " + moduleName + " was successful.");
             jedis = new Jedis("localhost", 6379, 5000);
-            flushAll();
             initProcessor(vertx.eventBus());
         }));
     }
@@ -151,9 +150,10 @@ public abstract class AbstractTestCase {
     }
 
     @After
-    public void tearDown() {
+    public void tearDown(TestContext context) {
         flushAll();
         jedis.close();
+        vertx.close(context.asyncAssertSuccess());
     }
 
     public JsonObject enqueueOperation(String queueName, String message){
