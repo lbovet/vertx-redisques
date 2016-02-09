@@ -44,6 +44,7 @@ public class RedisQuesTest extends AbstractTestCase {
         }
     }
 
+    @Ignore
     @Test
     public void enqueue(TestContext context) {
         Async async = context.async();
