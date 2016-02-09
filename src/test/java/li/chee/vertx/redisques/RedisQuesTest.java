@@ -7,6 +7,7 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -76,10 +77,11 @@ public class RedisQuesTest extends AbstractTestCase {
         });
     }
 
+    @Ignore
     @Test
     public void deleteAllQueueItems(TestContext context) {
         Async async = context.async();
-//        flushAll();
+        flushAll();
         assertKeyCount(context, QUEUES_PREFIX, 0);
         final String queue = "queue1";
         eventBusSend(enqueueOperation(queue, "some_val"), message -> {
