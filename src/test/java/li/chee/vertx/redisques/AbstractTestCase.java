@@ -229,9 +229,7 @@ public abstract class AbstractTestCase {
                     message = m;
                 }
                 signature.update(message.getBytes());
-                JsonObject operation = buildOperation(Operation.enqueue, new JsonObject().put(QUEUENAME, queue));
-                operation.put(MESSAGE, message);
-                vertx.eventBus().send("redisques", operation, new Handler<AsyncResult<Message<JsonObject>>>() {
+                vertx.eventBus().send("redisques", enqueueOperation(queue, message), new Handler<AsyncResult<Message<JsonObject>>>() {
                     @Override
                     public void handle(AsyncResult<Message<JsonObject>> event) {
                         if(event.result().body().getString(STATUS).equals(OK)) {
@@ -244,9 +242,7 @@ public abstract class AbstractTestCase {
                 });
                 messageCount++;
             } else {
-                JsonObject operation = buildOperation(Operation.enqueue, new JsonObject().put(QUEUENAME, queue));
-                operation.put(MESSAGE, "STOP");
-                vertx.eventBus().send("redisques", operation, new Handler<AsyncResult<Message<JsonObject>>>() {
+                vertx.eventBus().send("redisques", enqueueOperation(queue, "STOP"), new Handler<AsyncResult<Message<JsonObject>>>() {
                     @Override
                     public void handle(AsyncResult<Message<JsonObject>> reply) {
                         context.assertEquals(OK, reply.result().body().getString(STATUS));
