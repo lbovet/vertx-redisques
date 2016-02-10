@@ -91,6 +91,7 @@ public abstract class AbstractTestCase {
 
     private static void setUp(TestContext context) {
         vertx = Vertx.vertx();
+        initProcessor(vertx.eventBus());
 
         JsonObject redisquesConfig = new JsonObject();
         redisquesConfig.put("redisHost", "localhost");
@@ -103,7 +104,6 @@ public abstract class AbstractTestCase {
         vertx.deployVerticle(moduleName, new DeploymentOptions().setConfig(redisquesConfig), context.asyncAssertSuccess(event -> {
             log.info("vert.x Deploy - " + moduleName + " was successful.");
             jedis = new Jedis("localhost", 6379, 5000);
-            initProcessor(vertx.eventBus());
         }));
     }
 
