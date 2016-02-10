@@ -7,7 +7,6 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -34,14 +33,13 @@ public class RedisQuesTest extends AbstractTestCase {
         });
     }
 
-    @Ignore
     @Test
     public void testMore(TestContext context) throws Exception {
         Async async = context.async();
         flushAll();
         assertKeyCount(context, 0);
         for (int i = 0; i < NUM_QUEUES; i++) {
-            new Sender(context, async, "queue" + i).send(null);
+            new Sender(context, async, "queue_" + i).send(null);
         }
     }
 

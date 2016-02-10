@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RunWith(VertxUnitRunner.class)
 public abstract class AbstractTestCase {
 
-    public static final int NUM_QUEUES = 15;
+    public static final int NUM_QUEUES = 10;
     public static final String OK = "ok";
     public static final String ERROR = "error";
     public static final String VALUE = "value";
@@ -185,7 +185,7 @@ public abstract class AbstractTestCase {
         return op;
     }
 
-    int numMessages = 50;
+    int numMessages = 5;
     AtomicInteger finished = new AtomicInteger();
 
     /**
