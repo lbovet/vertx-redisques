@@ -279,11 +279,10 @@ public class RedisQues extends AbstractVerticle {
         return lockInfo;
     }
 
-//    @Override
-//    public void stop(Future<Void> stopFuture) {
-//        unregisterConsumers(true);
-//        stopFuture.complete();
-//    }
+    @Override
+    public void stop() {
+        unregisterConsumers(true);
+    }
 
     private void gracefulStop(final Handler<Void> doneHandler) {
         conumersMessageConsumer.unregister(event -> uidMessageConsumer.unregister(event1 -> {
