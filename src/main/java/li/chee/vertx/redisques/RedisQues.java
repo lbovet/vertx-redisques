@@ -2,7 +2,6 @@ package li.chee.vertx.redisques;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
-import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
@@ -280,11 +279,11 @@ public class RedisQues extends AbstractVerticle {
         return lockInfo;
     }
 
-    @Override
-    public void stop(Future<Void> stopFuture) {
-        unregisterConsumers(true);
-        stopFuture.complete();
-    }
+//    @Override
+//    public void stop(Future<Void> stopFuture) {
+//        unregisterConsumers(true);
+//        stopFuture.complete();
+//    }
 
     private void gracefulStop(final Handler<Void> doneHandler) {
         conumersMessageConsumer.unregister(event -> uidMessageConsumer.unregister(event1 -> {
