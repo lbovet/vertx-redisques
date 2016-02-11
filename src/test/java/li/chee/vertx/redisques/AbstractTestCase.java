@@ -11,11 +11,12 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
+import io.vertx.ext.unit.junit.Timeout;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
-import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.runner.RunWith;
 import redis.clients.jedis.Jedis;
 
@@ -25,11 +26,12 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @RunWith(VertxUnitRunner.class)
 public abstract class AbstractTestCase {
 
-    public static final int NUM_QUEUES = 15;
+    public static final int NUM_QUEUES = 10;
     public static final String OK = "ok";
     public static final String ERROR = "error";
     public static final String VALUE = "value";
@@ -46,9 +48,12 @@ public abstract class AbstractTestCase {
     public static final String QUEUES_PREFIX = "redisques:queues:";
     public static final String REDISQUES_LOCKS = "redisques:locks";
 
-    Vertx vertx;
-    Logger log = LoggerFactory.getLogger(AbstractTestCase.class);
-    protected Jedis jedis;
+    @Rule
+    public Timeout rule = Timeout.seconds(5);
+
+    static Vertx vertx;
+    static Logger log = LoggerFactory.getLogger(AbstractTestCase.class);
+    protected static Jedis jedis;
 
     public enum Operation{
         addItem, deleteItem, deleteLock, getAllLocks, getItem, getLock, enqueue, getListRange, deleteAllQueueItems, putLock, replaceItem
@@ -69,22 +74,24 @@ public abstract class AbstractTestCase {
     }
 
     @BeforeClass
-    public static void config() {
+    public static void config(TestContext context) {
         if(!RedisEmbeddedConfiguration.useExternalRedis()) {
             RedisEmbeddedConfiguration.redisServer.start();
         }
+        setUp(context);
     }
 
     @AfterClass
-    public static void stopRedis() {
+    public static void stopRedis(TestContext context) {
         if(!RedisEmbeddedConfiguration.useExternalRedis()) {
             RedisEmbeddedConfiguration.redisServer.stop();
         }
+        jedis.close();
     }
 
-    @Before
-    public void setUp(TestContext context) {
+    private static void setUp(TestContext context) {
         vertx = Vertx.vertx();
+        initProcessor(vertx.eventBus());
 
         JsonObject redisquesConfig = new JsonObject();
         redisquesConfig.put("redisHost", "localhost");
@@ -97,12 +104,10 @@ public abstract class AbstractTestCase {
         vertx.deployVerticle(moduleName, new DeploymentOptions().setConfig(redisquesConfig), context.asyncAssertSuccess(event -> {
             log.info("vert.x Deploy - " + moduleName + " was successful.");
             jedis = new Jedis("localhost", 6379, 5000);
-            flushAll();
-            initProcessor(vertx.eventBus());
         }));
     }
 
-    private void initProcessor(EventBus eventBus){
+    private static void initProcessor(EventBus eventBus){
 
         final Map<String, Integer> counters = new HashMap<>();
         final Map<String, MessageDigest> signatures = new HashMap<>();
@@ -150,10 +155,9 @@ public abstract class AbstractTestCase {
         });
     }
 
-    @After
-    public void tearDown() {
+    @Before
+    public void cleanDB() {
         flushAll();
-        jedis.close();
     }
 
     public JsonObject enqueueOperation(String queueName, String message){
@@ -181,8 +185,8 @@ public abstract class AbstractTestCase {
         return op;
     }
 
-    int numMessages = 50;
-    int finished = 0;
+    int numMessages = 5;
+    AtomicInteger finished = new AtomicInteger();
 
     /**
      * Sender Class
@@ -209,8 +213,7 @@ public abstract class AbstractTestCase {
                 public void handle(Message<String> event) {
                     log.info("Received signature for " + queue + ": " + event.body());
                     context.assertEquals(event.body(), DatatypeConverter.printBase64Binary(signature.digest()), "Signatures differ");
-                    finished++;
-                    if (finished == NUM_QUEUES) {
+                    if (finished.incrementAndGet() == NUM_QUEUES) {
                         async.complete();
                     }
                 }
@@ -226,9 +229,7 @@ public abstract class AbstractTestCase {
                     message = m;
                 }
                 signature.update(message.getBytes());
-                JsonObject operation = buildOperation(Operation.enqueue, new JsonObject().put(QUEUENAME, queue));
-                operation.put(MESSAGE, message);
-                vertx.eventBus().send("redisques", operation, new Handler<AsyncResult<Message<JsonObject>>>() {
+                vertx.eventBus().send("redisques", enqueueOperation(queue, message), new Handler<AsyncResult<Message<JsonObject>>>() {
                     @Override
                     public void handle(AsyncResult<Message<JsonObject>> event) {
                         if(event.result().body().getString(STATUS).equals(OK)) {
@@ -241,9 +242,7 @@ public abstract class AbstractTestCase {
                 });
                 messageCount++;
             } else {
-                JsonObject operation = buildOperation(Operation.enqueue, new JsonObject().put(QUEUENAME, queue));
-                operation.put(MESSAGE, "STOP");
-                vertx.eventBus().send("redisques", operation, new Handler<AsyncResult<Message<JsonObject>>>() {
+                vertx.eventBus().send("redisques", enqueueOperation(queue, "STOP"), new Handler<AsyncResult<Message<JsonObject>>>() {
                     @Override
                     public void handle(AsyncResult<Message<JsonObject>> reply) {
                         context.assertEquals(OK, reply.result().body().getString(STATUS));

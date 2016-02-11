@@ -39,7 +39,7 @@ public class RedisQuesTest extends AbstractTestCase {
         flushAll();
         assertKeyCount(context, 0);
         for (int i = 0; i < NUM_QUEUES; i++) {
-            new Sender(context, async, "queue" + i).send(null);
+            new Sender(context, async, "queue_" + i).send(null);
         }
     }
 
