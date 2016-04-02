@@ -1,26 +1,26 @@
-package li.chee.vertx.redisques.handler;
+package org.swisspush.redisques.handler;
 
 import io.vertx.core.AsyncResult;
+import org.swisspush.redisques.RedisQues;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;
-import li.chee.vertx.redisques.RedisQues;
 
 /**
- * Class AddItemHandler.
+ * Class DeleteAllQueueItems.
  *
  * @author baldim
  */
-public class AddItemHandler implements Handler<AsyncResult<Long>> {
+public class DeleteAllQueueItems implements Handler<AsyncResult<Long>> {
     private Message<JsonObject> event;
 
-    public AddItemHandler(Message<JsonObject> event) {
+    public DeleteAllQueueItems(Message<JsonObject> event) {
         this.event = event;
     }
 
     @Override
     public void handle(AsyncResult<Long> reply) {
-        if(reply.succeeded()){
+        if (reply.result() > 0) {
             event.reply(new JsonObject().put(RedisQues.STATUS, RedisQues.OK));
         } else {
             event.reply(new JsonObject().put(RedisQues.STATUS, RedisQues.ERROR));

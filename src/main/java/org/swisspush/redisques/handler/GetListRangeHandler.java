@@ -1,8 +1,8 @@
-package li.chee.vertx.redisques.handler;
+package org.swisspush.redisques.handler;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.json.JsonArray;
-import li.chee.vertx.redisques.RedisQues;
+import org.swisspush.redisques.RedisQues;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;

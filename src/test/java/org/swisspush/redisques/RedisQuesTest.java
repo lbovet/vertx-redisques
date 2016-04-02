@@ -1,4 +1,4 @@
-package li.chee.vertx.redisques;
+package org.swisspush.redisques;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
