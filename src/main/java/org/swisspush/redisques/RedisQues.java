@@ -1,4 +1,4 @@
-package li.chee.vertx.redisques;
+package org.swisspush.redisques;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
@@ -13,7 +13,7 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.redis.RedisClient;
 import io.vertx.redis.RedisOptions;
 import io.vertx.redis.op.RangeLimitOptions;
-import li.chee.vertx.redisques.handler.*;
+import org.swisspush.redisques.handler.*;
 
 import java.util.HashMap;
 import java.util.Map;

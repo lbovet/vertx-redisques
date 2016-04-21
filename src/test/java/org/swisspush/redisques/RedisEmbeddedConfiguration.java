@@ -1,4 +1,4 @@
-package li.chee.vertx.redisques;
+package org.swisspush.redisques;
 
 import redis.embedded.RedisExecProvider;
 import redis.embedded.RedisServer;

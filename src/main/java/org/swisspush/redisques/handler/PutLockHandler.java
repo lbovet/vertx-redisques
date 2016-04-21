@@ -1,20 +1,20 @@
-package li.chee.vertx.redisques.handler;
+package org.swisspush.redisques.handler;
 
 import io.vertx.core.AsyncResult;
-import li.chee.vertx.redisques.RedisQues;
+import org.swisspush.redisques.RedisQues;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;
 
 /**
- * Class ReplaceItemHandler.
+ * Class PutLock.
  *
  * @author baldim
  */
-public class ReplaceItemHandler implements Handler<AsyncResult<String>> {
+public class PutLockHandler implements Handler<AsyncResult<String>> {
     private Message<JsonObject> event;
 
-    public ReplaceItemHandler(Message<JsonObject> event) {
+    public PutLockHandler(Message<JsonObject> event) {
         this.event = event;
     }
 

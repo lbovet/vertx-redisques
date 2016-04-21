@@ -1,7 +1,7 @@
 {
-    "main": "li.chee.vertx.redisques.RedisQues",
+    "main": "org.swisspush.redisques.RedisQues",
     "description":"A highly scalable redis-persistent queuing system for Vert.x",
     "licenses": ["The Apache Software License Version 2.0"],
     "author": "Laurent Bovet",
-    "homepage": "https://github.com/lbovet/vertx-redisques"
+    "homepage": "https://github.com/swisspush/vertx-redisques"
 }

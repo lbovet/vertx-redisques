@@ -1,4 +1,4 @@
-package li.chee.vertx.redisques;
+package org.swisspush.redisques;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.DeploymentOptions;
@@ -99,10 +99,9 @@ public abstract class AbstractTestCase {
         redisquesConfig.put("redisEncoding", "ISO-8859-1");
         redisquesConfig.put("processor-address", "processor-address");
 
-        String moduleName = "li.chee.vertx.redisques.RedisQues";
-
-        vertx.deployVerticle(moduleName, new DeploymentOptions().setConfig(redisquesConfig), context.asyncAssertSuccess(event -> {
-            log.info("vert.x Deploy - " + moduleName + " was successful.");
+        RedisQues redisQues = new RedisQues();
+        vertx.deployVerticle(redisQues, new DeploymentOptions().setConfig(redisquesConfig), context.asyncAssertSuccess(event -> {
+            log.info("vert.x Deploy - " + redisQues.getClass().getSimpleName() + " was successful.");
             jedis = new Jedis("localhost", 6379, 5000);
         }));
     }
