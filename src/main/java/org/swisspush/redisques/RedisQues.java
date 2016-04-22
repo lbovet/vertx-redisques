@@ -456,7 +456,7 @@ public class RedisQues extends AbstractVerticle {
 
         // start a timer, which will cancel the processing, if the consumer didn't respond
         final long timeoutId = vertx.setTimer(processorTimeout, timeoutId1 -> {
-            log.debug("RedisQues QUEUE_ERROR: Consumer timeout " + uid + " queue: " + queue);
+            log.info("RedisQues QUEUE_ERROR: Consumer timeout " + uid + " queue: " + queue);
             handler.handle(new SendResult(false, timeoutId1));
         });
 
@@ -464,7 +464,13 @@ public class RedisQues extends AbstractVerticle {
         eb.send(processorAddress, message, new Handler<AsyncResult<Message<JsonObject>>>() {
             @Override
             public void handle(AsyncResult<Message<JsonObject>> reply) {
-                handler.handle(new SendResult(reply.result().body().getString(STATUS).equals(OK), timeoutId));
+                Boolean success;
+                if(reply.succeeded()){
+                    success = OK.equals(reply.result().body().getString(STATUS));
+                } else {
+                    success = Boolean.FALSE;
+                }
+                handler.handle(new SendResult(success, timeoutId));
             }
         });
         updateTimestamp(queue, null);
