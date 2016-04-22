@@ -14,6 +14,7 @@ import io.vertx.redis.RedisClient;
 import io.vertx.redis.RedisOptions;
 import io.vertx.redis.op.RangeLimitOptions;
 import org.swisspush.redisques.handler.*;
+import org.swisspush.redisques.util.RedisquesConfiguration;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -118,18 +119,18 @@ public class RedisQues extends AbstractVerticle {
         final EventBus eb = vertx.eventBus();
         log.info("Started with UID " + uid);
 
-        JsonObject config = config();
+        RedisquesConfiguration modConfig = RedisquesConfiguration.fromJsonObject(config());
+        log.info("Starting Redisques module with configuration: " + modConfig);
 
-        address = config.getString("address") != null ? config.getString("address") : address;
-        redisPrefix = config.getString("redis-prefix") != null ? config.getString("redis-prefix") : redisPrefix;
-        processorAddress = config.getString("processor-address") != null ? config.getString("processor-address") : processorAddress;
-        refreshPeriod = config.getInteger("refresh-period") != null ? config.getInteger("refresh-period") : refreshPeriod;
+        address = modConfig.getAddress();
+        redisPrefix = modConfig.getRedisPrefix();
+        processorAddress = modConfig.getProcessorAddress();
+        refreshPeriod = modConfig.getRefreshPeriod();
 
-        String redisHost = config.getString("redisHost", "localhost");
-        int redisPort = config.getInteger("redisPort", 6379);
-        String redisEncoding = config.getString("redisEncoding", "UTF-8");
-
-        this.redisClient = RedisClient.create(vertx, new RedisOptions().setHost(redisHost).setPort(redisPort).setEncoding(redisEncoding));
+        this.redisClient = RedisClient.create(vertx, new RedisOptions()
+                .setHost(modConfig.getRedisHost())
+                .setPort(modConfig.getRedisPort())
+                .setEncoding(modConfig.getRedisEncoding()));
 
         // Handles operations
         eb.localConsumer(address, new Handler<Message<JsonObject>>() {
