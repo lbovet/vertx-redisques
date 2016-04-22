@@ -18,6 +18,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.runner.RunWith;
+import org.swisspush.redisques.util.RedisquesConfiguration;
 import redis.clients.jedis.Jedis;
 
 import javax.xml.bind.DatatypeConverter;
@@ -93,14 +94,14 @@ public abstract class AbstractTestCase {
         vertx = Vertx.vertx();
         initProcessor(vertx.eventBus());
 
-        JsonObject redisquesConfig = new JsonObject();
-        redisquesConfig.put("redisHost", "localhost");
-        redisquesConfig.put("redisPort", 6379);
-        redisquesConfig.put("redisEncoding", "ISO-8859-1");
-        redisquesConfig.put("processor-address", "processor-address");
+        JsonObject config = RedisquesConfiguration.with()
+                .processorAddress("processor-address")
+                .redisEncoding("ISO-8859-1")
+                .build()
+                .asJsonObject();
 
         RedisQues redisQues = new RedisQues();
-        vertx.deployVerticle(redisQues, new DeploymentOptions().setConfig(redisquesConfig), context.asyncAssertSuccess(event -> {
+        vertx.deployVerticle(redisQues, new DeploymentOptions().setConfig(config), context.asyncAssertSuccess(event -> {
             log.info("vert.x Deploy - " + redisQues.getClass().getSimpleName() + " was successful.");
             jedis = new Jedis("localhost", 6379, 5000);
         }));
