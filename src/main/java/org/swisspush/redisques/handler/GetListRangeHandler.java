@@ -2,7 +2,7 @@ package org.swisspush.redisques.handler;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.json.JsonArray;
-import org.swisspush.redisques.RedisQues;
+import static org.swisspush.redisques.util.RedisquesAPI.*;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;
@@ -28,9 +28,9 @@ public class GetListRangeHandler implements Handler<AsyncResult<JsonArray>> {
             JsonArray countInfo = new JsonArray();
             countInfo.add(resultArray.size());
             countInfo.add(queueItemCount);
-            event.reply(new JsonObject().put(RedisQues.STATUS, RedisQues.OK).put(RedisQues.VALUE, resultArray).put(RedisQues.INFO, countInfo));
+            event.reply(new JsonObject().put(STATUS, OK).put(VALUE, resultArray).put(INFO, countInfo));
         } else {
-            event.reply(new JsonObject().put(RedisQues.STATUS, RedisQues.ERROR));
+            event.reply(new JsonObject().put(STATUS, ERROR));
         }
     }
 }

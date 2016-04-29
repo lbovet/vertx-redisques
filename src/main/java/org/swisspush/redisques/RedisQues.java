@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.swisspush.redisques.util.RedisquesAPI.*;
+
 public class RedisQues extends AbstractVerticle {
 
     // State of each queue. Consuming means there is a message being processed.
@@ -65,20 +67,7 @@ public class RedisQues extends AbstractVerticle {
     // Address of message processors
     private String processorAddress = "redisques-processor";
 
-    public static final String STATUS = "status";
-    public static final String MESSAGE = "message";
-    public static final String VALUE = "value";
-    public static final String INFO = "info";
-    public static final String OK = "ok";
-    public static final String ERROR = "error";
-    public static final String PAYLOAD = "payload";
-    public static final String QUEUE_NAME = "queuename";
-    public static final String REQUESTED_BY = "requestedBy";
     public static final String TIMESTAMP = "timestamp";
-    public static final String LIMIT = "limit";
-    public static final String INDEX = "index";
-    public static final String BUFFER = "buffer";
-    public static final String OPERATION = "operation";
 
     // Consumers periodically refresh their subscription while they are
     // consuming.
@@ -141,19 +130,19 @@ public class RedisQues extends AbstractVerticle {
                 }
                 switch (operation) {
                     case "enqueue":
-                        updateTimestamp(event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME), null);
-                        String keyEnqueue = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME);
+                        updateTimestamp(event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), null);
+                        String keyEnqueue = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         String valueEnqueue = event.body().getString(MESSAGE);
                         redisClient.rpush(keyEnqueue, valueEnqueue, event2 -> {
                             JsonObject reply = new JsonObject();
                             if(event2.succeeded()){
-                                log.debug("RedisQues Enqueued message into queue " + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME));
-                                notifyConsumer(event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME));
+                                log.debug("RedisQues Enqueued message into queue " + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME));
+                                notifyConsumer(event.body().getJsonObject(PAYLOAD).getString(QUEUENAME));
                                 reply.put(STATUS, OK);
                                 reply.put(MESSAGE, "enqueued");
                                 event.reply(reply);
                             } else {
-                                String message = "RedisQues QUEUE_ERROR: Error while enqueing message into queue " + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME);
+                                String message = "RedisQues QUEUE_ERROR: Error while enqueueing message into queue " + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                                 log.error(message);
                                 reply.put(STATUS, ERROR);
                                 reply.put(MESSAGE, message);
@@ -174,23 +163,23 @@ public class RedisQues extends AbstractVerticle {
                         });
                         break;
                     case "getListRange":
-                        String keyListRange = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME);
+                        String keyListRange = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int maxQueueItemCountIndex = getMaxQueueItemCountIndex(event.body().getJsonObject(PAYLOAD).getString(LIMIT));
                         redisClient.llen(keyListRange, countReply -> {
                             redisClient.lrange(keyListRange, 0, maxQueueItemCountIndex, new GetListRangeHandler(event, countReply.result()));
                         });
                         break;
                     case "addItem":
-                        String key1 = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME);
+                        String key1 = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         String valueAddItem = event.body().getJsonObject(PAYLOAD).getString(BUFFER);
                         redisClient.rpush(key1, valueAddItem, new AddItemHandler(event));
                         break;
                     case "deleteItem":
-                        String keyLset = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME);
+                        String keyLset = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int indexLset = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
                         redisClient.lset(keyLset, indexLset, "TO_DELETE", event1 -> {
                             if(event1.succeeded()){
-                                String keyLrem = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME);
+                                String keyLrem = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                                 redisClient.lrem(keyLrem, 0, "TO_DELETE", replyLrem -> event.reply(new JsonObject().put(STATUS, OK)));
                             } else {
                                 event.reply(new JsonObject().put(STATUS, ERROR));
@@ -198,18 +187,18 @@ public class RedisQues extends AbstractVerticle {
                         });
                         break;
                     case "getItem":
-                        String key = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME);
+                        String key = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int index = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
                         redisClient.lindex(key, index, new GetItemHandler(event));
                         break;
                     case "replaceItem":
-                        String keyReplaceItem = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME);
+                        String keyReplaceItem = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int indexReplaceItem = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
                         String bufferReplaceItem = event.body().getJsonObject(PAYLOAD).getString(BUFFER);
                         redisClient.lset(keyReplaceItem, indexReplaceItem, bufferReplaceItem, new ReplaceItemHandler(event));
                         break;
                     case "deleteAllQueueItems":
-                        redisClient.del(queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME), new DeleteAllQueueItems(event));
+                        redisClient.del(queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new DeleteAllQueueItems(event));
                         break;
                     case "getAllLocks":
                         redisClient.hkeys(redisques_locks, new GetAllLocksHandler(event));
@@ -217,17 +206,20 @@ public class RedisQues extends AbstractVerticle {
                     case "putLock":
                         JsonObject lockInfo = extractLockInfo(event.body().getJsonObject(PAYLOAD).getString(REQUESTED_BY));
                         if (lockInfo != null) {
-                            redisClient.hmset(redisques_locks, new JsonObject().put(event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME), lockInfo.encode()),
+                            redisClient.hmset(redisques_locks, new JsonObject().put(event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), lockInfo.encode()),
                                     new PutLockHandler(event));
                         } else {
                             event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, "Property '" + REQUESTED_BY + "' missing"));
                         }
                         break;
                     case "getLock":
-                        redisClient.hget(redisques_locks, event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME),new GetLockHandler(event));
+                        redisClient.hget(redisques_locks, event.body().getJsonObject(PAYLOAD).getString(QUEUENAME),new GetLockHandler(event));
                         break;
                     case "deleteLock":
-                        redisClient.hdel(redisques_locks, event.body().getJsonObject(PAYLOAD).getString(QUEUE_NAME), new DeleteLockHandler(event));
+                        redisClient.hdel(redisques_locks, event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new DeleteLockHandler(event));
+                        break;
+                    case "queueItemCount":
+                        redisClient.llen(queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new QueueItemCountHandler(event));
                         break;
                 }
             }

@@ -5,7 +5,7 @@ import io.vertx.core.Handler;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import org.swisspush.redisques.RedisQues;
+import static org.swisspush.redisques.util.RedisquesAPI.*;
 
 import java.util.List;
 
@@ -32,14 +32,9 @@ public class GetAllLocksHandler implements Handler<AsyncResult<JsonArray>> {
                 items.add((String) item);
             }
             result.put("locks", items);
-            event.reply(new JsonObject()
-                    .put(RedisQues.STATUS, RedisQues.OK)
-                    .put(RedisQues.VALUE, result)
-            );
+            event.reply(new JsonObject().put(STATUS, OK).put(VALUE, result));
         } else {
-            event.reply(new JsonObject()
-                    .put(RedisQues.STATUS, RedisQues.ERROR)
-            );
+            event.reply(new JsonObject().put(STATUS, ERROR));
         }
     }
 }

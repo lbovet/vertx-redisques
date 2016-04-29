@@ -1,10 +1,11 @@
 package org.swisspush.redisques.handler;
 
 import io.vertx.core.AsyncResult;
-import org.swisspush.redisques.RedisQues;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;
+
+import static org.swisspush.redisques.util.RedisquesAPI.*;
 
 /**
  * Class GetLockHandler.
@@ -21,12 +22,9 @@ public class GetLockHandler implements Handler<AsyncResult<String>> {
     @Override
     public void handle(AsyncResult<String> reply) {
         if (reply.result() != null) {
-            event.reply(new JsonObject()
-                    .put(RedisQues.STATUS, RedisQues.OK)
-                    .put(RedisQues.VALUE, reply.result())
-            );
+            event.reply(new JsonObject().put(STATUS, OK).put(VALUE, reply.result()));
         } else {
-            event.reply(new JsonObject().put(RedisQues.STATUS, "No such lock"));
+            event.reply(new JsonObject().put(STATUS, NO_SUCH_LOCK));
         }
     }
 }
