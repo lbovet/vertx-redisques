@@ -77,6 +77,7 @@ public class RedisQues extends AbstractVerticle {
     private int processorTimeout = 240000;
 
     private static final int DEFAULT_MAX_QUEUEITEM_COUNT = 49;
+    private static final int MAX_AGE_MILLISECONDS = 120000; // 120 seconds
 
     // Handler receiving registration requests when no consumer is registered
     // for a queue.
@@ -227,6 +228,10 @@ public class RedisQues extends AbstractVerticle {
                         break;
                     case queueItemCount:
                         redisClient.llen(queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new QueueItemCountHandler(event));
+                        break;
+                    case queueCount:
+                        long timestamp = System.currentTimeMillis() - MAX_AGE_MILLISECONDS;
+                        redisClient.zcount(redisPrefix + "queues", timestamp, Double.MAX_VALUE, new QueueCountHandler(event));
                         break;
                     default:
                         unsupportedOperation(operation, event);

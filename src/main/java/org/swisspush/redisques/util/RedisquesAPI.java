@@ -26,7 +26,7 @@ public class RedisquesAPI {
     public enum QueueOperation {
         enqueue, check, reset, stop, getListRange, addItem, deleteItem,
         getItem, replaceItem, deleteAllQueueItems, getAllLocks, putLock,
-        getLock, deleteLock, queueItemCount;
+        getLock, deleteLock, queueCount, queueItemCount;
 
         public static QueueOperation fromString(String op){
             for (QueueOperation queueOperation : values()) {
@@ -82,6 +82,10 @@ public class RedisquesAPI {
 
     public static JsonObject buildDeleteAllQueueItemsOperation(String queueName){
         return buildOperation(QueueOperation.deleteAllQueueItems, new JsonObject().put(QUEUENAME, queueName));
+    }
+
+    public static JsonObject buildQueueCountOperation(){
+        return buildOperation(QueueOperation.queueCount);
     }
 
     public static JsonObject buildQueueItemCountOperation(String queueName){
