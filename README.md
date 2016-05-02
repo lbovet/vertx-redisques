@@ -103,6 +103,25 @@ Response Data
 }
 ```
 
+#### getQueues
+
+Request Data
+
+```
+{
+    "operation": "getQueues"
+}
+```
+
+Response Data
+
+```
+{
+    "status": "ok" / "error",
+    "value": <objArr RESULT>
+}
+```
+
 #### getQueuesCount
 
 Request Data

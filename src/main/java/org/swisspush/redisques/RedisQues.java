@@ -230,8 +230,10 @@ public class RedisQues extends AbstractVerticle {
                         redisClient.llen(queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new GetQueueItemsCountHandler(event));
                         break;
                     case getQueuesCount:
-                        long timestamp = System.currentTimeMillis() - MAX_AGE_MILLISECONDS;
-                        redisClient.zcount(redisPrefix + "queues", timestamp, Double.MAX_VALUE, new GetQueuesCountHandler(event));
+                        redisClient.zcount(redisPrefix + "queues", getMaxAgeTimestamp(), Double.MAX_VALUE, new GetQueuesCountHandler(event));
+                        break;
+                    case getQueues:
+                        redisClient.zrangebyscore(redisPrefix + "queues", String.valueOf(getMaxAgeTimestamp()), "+inf", RangeLimitOptions.NONE, new GetQueuesHandler(event));
                         break;
                     default:
                         unsupportedOperation(operation, event);
@@ -274,6 +276,10 @@ public class RedisQues extends AbstractVerticle {
                 });
             });
         });
+    }
+
+    private long getMaxAgeTimestamp(){
+        return System.currentTimeMillis() - MAX_AGE_MILLISECONDS;
     }
 
     private void unsupportedOperation(String operation, Message<JsonObject> event){

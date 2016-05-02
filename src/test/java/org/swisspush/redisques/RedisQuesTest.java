@@ -92,6 +92,32 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
+    public void getQueues(TestContext context) {
+        Async asyncEnqueue = context.async(100);
+        flushAll();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        for (int i = 0; i < 100; i++) {
+            eventBusSend(buildEnqueueOperation("queue" + i, "testItem"), message -> {
+                context.assertEquals(OK, message.result().body().getString(STATUS));
+                asyncEnqueue.countDown();
+            });
+        }
+        asyncEnqueue.awaitSuccess();
+
+        assertKeyCount(context, QUEUES_PREFIX, 100);
+        Async async = context.async();
+        eventBusSend(buildGetQueuesOperation(), message -> {
+            context.assertEquals(OK, message.result().body().getString(STATUS));
+            JsonArray queuesArray = message.result().body().getJsonObject(VALUE).getJsonArray("queues");
+            context.assertEquals(100, queuesArray.size());
+            for (int i = 0; i < 100; i++) {
+                context.assertTrue(queuesArray.contains("queue"+i), "item queue" + i + " expected to be in result");
+            }
+            async.complete();
+        });
+    }
+
+    @Test
     public void getQueuesCount(TestContext context) {
         Async asyncEnqueue = context.async(100);
         flushAll();
