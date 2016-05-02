@@ -128,8 +128,15 @@ public class RedisQues extends AbstractVerticle {
                 if (log.isTraceEnabled()) {
                     log.trace("RedisQues got operation:" + operation);
                 }
-                switch (operation) {
-                    case "enqueue":
+
+                QueueOperation queueOperation = QueueOperation.fromString(operation);
+                if(queueOperation == null){
+                    unsupportedOperation(operation, event);
+                    return;
+                }
+
+                switch (queueOperation) {
+                    case enqueue:
                         updateTimestamp(event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), null);
                         String keyEnqueue = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         String valueEnqueue = event.body().getString(MESSAGE);
@@ -150,31 +157,31 @@ public class RedisQues extends AbstractVerticle {
                             }
                         });
                         break;
-                    case "check":
+                    case check:
                         checkQueues();
                         break;
-                    case "reset":
+                    case reset:
                         resetConsumers();
                         break;
-                    case "stop":
+                    case stop:
                         gracefulStop(event1 -> {
                             JsonObject reply = new JsonObject();
                             reply.put(STATUS, OK);
                         });
                         break;
-                    case "getListRange":
+                    case getListRange:
                         String keyListRange = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int maxQueueItemCountIndex = getMaxQueueItemCountIndex(event.body().getJsonObject(PAYLOAD).getString(LIMIT));
                         redisClient.llen(keyListRange, countReply -> {
                             redisClient.lrange(keyListRange, 0, maxQueueItemCountIndex, new GetListRangeHandler(event, countReply.result()));
                         });
                         break;
-                    case "addItem":
+                    case addItem:
                         String key1 = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         String valueAddItem = event.body().getJsonObject(PAYLOAD).getString(BUFFER);
                         redisClient.rpush(key1, valueAddItem, new AddItemHandler(event));
                         break;
-                    case "deleteItem":
+                    case deleteItem:
                         String keyLset = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int indexLset = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
                         redisClient.lset(keyLset, indexLset, "TO_DELETE", event1 -> {
@@ -186,24 +193,24 @@ public class RedisQues extends AbstractVerticle {
                             }
                         });
                         break;
-                    case "getItem":
+                    case getItem:
                         String key = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int index = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
                         redisClient.lindex(key, index, new GetItemHandler(event));
                         break;
-                    case "replaceItem":
+                    case replaceItem:
                         String keyReplaceItem = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int indexReplaceItem = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
                         String bufferReplaceItem = event.body().getJsonObject(PAYLOAD).getString(BUFFER);
                         redisClient.lset(keyReplaceItem, indexReplaceItem, bufferReplaceItem, new ReplaceItemHandler(event));
                         break;
-                    case "deleteAllQueueItems":
+                    case deleteAllQueueItems:
                         redisClient.del(queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new DeleteAllQueueItems(event));
                         break;
-                    case "getAllLocks":
+                    case getAllLocks:
                         redisClient.hkeys(redisques_locks, new GetAllLocksHandler(event));
                         break;
-                    case "putLock":
+                    case putLock:
                         JsonObject lockInfo = extractLockInfo(event.body().getJsonObject(PAYLOAD).getString(REQUESTED_BY));
                         if (lockInfo != null) {
                             redisClient.hmset(redisques_locks, new JsonObject().put(event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), lockInfo.encode()),
@@ -212,15 +219,17 @@ public class RedisQues extends AbstractVerticle {
                             event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, "Property '" + REQUESTED_BY + "' missing"));
                         }
                         break;
-                    case "getLock":
+                    case getLock:
                         redisClient.hget(redisques_locks, event.body().getJsonObject(PAYLOAD).getString(QUEUENAME),new GetLockHandler(event));
                         break;
-                    case "deleteLock":
+                    case deleteLock:
                         redisClient.hdel(redisques_locks, event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new DeleteLockHandler(event));
                         break;
-                    case "queueItemCount":
+                    case queueItemCount:
                         redisClient.llen(queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new QueueItemCountHandler(event));
                         break;
+                    default:
+                        unsupportedOperation(operation, event);
                 }
             }
         });
@@ -260,6 +269,15 @@ public class RedisQues extends AbstractVerticle {
                 });
             });
         });
+    }
+
+    private void unsupportedOperation(String operation, Message<JsonObject> event){
+        JsonObject reply = new JsonObject();
+        String message = "QUEUE_ERROR: Unsupported operation received: " + operation;
+        log.error(message);
+        reply.put(STATUS, ERROR);
+        reply.put(MESSAGE, message);
+        event.reply(reply);
     }
 
     private JsonObject extractLockInfo(String requestedBy) {

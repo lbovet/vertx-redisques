@@ -26,7 +26,16 @@ public class RedisquesAPI {
     public enum QueueOperation {
         enqueue, check, reset, stop, getListRange, addItem, deleteItem,
         getItem, replaceItem, deleteAllQueueItems, getAllLocks, putLock,
-        getLock, deleteLock, queueItemCount
+        getLock, deleteLock, queueItemCount;
+
+        public static QueueOperation fromString(String op){
+            for (QueueOperation queueOperation : values()) {
+                if(queueOperation.name().equalsIgnoreCase(op)){
+                    return queueOperation;
+                }
+            }
+            return null;
+        }
     }
 
     public static JsonObject buildOperation(QueueOperation queueOperation){

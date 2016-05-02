@@ -19,10 +19,21 @@ import static org.swisspush.redisques.util.RedisquesAPI.*;
 public class RedisQuesTest extends AbstractTestCase {
 
     @Test
+    public void testUnsupportedOperation(TestContext context) {
+        Async async = context.async();
+        JsonObject op = new JsonObject();
+        op.put(OPERATION, "some_unkown_operation");
+        eventBusSend(op, message -> {
+            context.assertEquals(ERROR, message.result().body().getString(STATUS));
+            context.assertEquals("QUEUE_ERROR: Unsupported operation received: some_unkown_operation", message.result().body().getString(MESSAGE));
+            async.complete();
+        });
+    }
+
+    @Test
     public void enqueueWithQueueProcessor(TestContext context) throws Exception {
         Async async = context.async();
         flushAll();
-        assertKeyCount(context, 0);
         final JsonObject operation = buildEnqueueOperation("queue1", "hello");
         vertx.eventBus().consumer("digest-queue1", (Handler<Message<String>>) event -> {});
         eventBusSend(operation, reply -> {
@@ -283,6 +294,24 @@ public class RedisQuesTest extends AbstractTestCase {
         flushAll();
         assertKeyCount(context, REDISQUES_LOCKS, 0);
         eventBusSend(buildGetLockOperation("notExistingLock"), message -> {
+            context.assertEquals(NO_SUCH_LOCK, message.result().body().getString(STATUS));
+            assertKeyCount(context, REDISQUES_LOCKS, 0);
+            context.assertFalse(jedis.hexists(REDISQUES_LOCKS, "notExistingLock"));
+            async.complete();
+        });
+    }
+
+    @Test
+    public void testIgnoreCaseInOperationName(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, REDISQUES_LOCKS, 0);
+
+        JsonObject op = new JsonObject();
+        op.put(OPERATION, "GeTLOcK");
+        op.put(PAYLOAD, new JsonObject().put(QUEUENAME, "notExistingLock"));
+
+        eventBusSend(op, message -> {
             context.assertEquals(NO_SUCH_LOCK, message.result().body().getString(STATUS));
             assertKeyCount(context, REDISQUES_LOCKS, 0);
             context.assertFalse(jedis.hexists(REDISQUES_LOCKS, "notExistingLock"));
