@@ -103,13 +103,13 @@ Response Data
 }
 ```
 
-#### queueCount
+#### getQueuesCount
 
 Request Data
 
 ```
 {
-    "operation": "queueCount"
+    "operation": "getQueuesCount"
 }
 ```
 
@@ -122,12 +122,12 @@ Response Data
 }
 ```
 
-#### queueItemCount
+#### getQueueItemsCount
 
 Request Data
 ```
 {
-    "operation": "queueItemCount",
+    "operation": "getQueueItemsCount",
     "payload": {
         "queuename": <str QUEUENAME>
     }
@@ -186,12 +186,12 @@ Response Data
 }
 ```
 
-#### getListRange
+#### getQueueItems
 
 Request Data
 ```
 {
-    "operation": "getListRange",
+    "operation": "getQueueItems",
     "payload": {
         "queuename": <str QUEUENAME>,
         "limit": <str LIMIT>
@@ -208,12 +208,12 @@ Response Data
 }
 ```
 
-#### addItem
+#### addQueueItem
 
 Request Data
 ```
 {
-    "operation": "addItem",
+    "operation": "addQueueItem",
     "payload": {
         "queuename": <str QUEUENAME>,
         "buffer": <str BUFFERDATA>
@@ -228,12 +228,12 @@ Response Data
 }
 ```
 
-#### getItem
+#### getQueueItem
 
 Request Data
 ```
 {
-    "operation": "getItem",
+    "operation": "getQueueItem",
     "payload": {
         "queuename": <str QUEUENAME>,
         "index": <int INDEX>
@@ -249,12 +249,12 @@ Response Data
 }
 ```
 
-#### replaceItem
+#### replaceQueueItem
 
 Request Data
 ```
 {
-    "operation": "replaceItem",
+    "operation": "replaceQueueItem",
     "payload": {
         "queuename": <str QUEUENAME>,
         "buffer": <str BUFFERDATA>,
@@ -270,12 +270,12 @@ Response Data
 }
 ```
 
-#### deleteItem
+#### deleteQueueItem
 
 Request Data
 ```
 {
-    "operation": "deleteItem",
+    "operation": "deleteQueueItem",
     "payload": {
         "queuename": <str QUEUENAME>,
         "index": <int INDEX>

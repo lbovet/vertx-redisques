@@ -170,19 +170,19 @@ public class RedisQues extends AbstractVerticle {
                             reply.put(STATUS, OK);
                         });
                         break;
-                    case getListRange:
+                    case getQueueItems:
                         String keyListRange = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int maxQueueItemCountIndex = getMaxQueueItemCountIndex(event.body().getJsonObject(PAYLOAD).getString(LIMIT));
                         redisClient.llen(keyListRange, countReply -> {
-                            redisClient.lrange(keyListRange, 0, maxQueueItemCountIndex, new GetListRangeHandler(event, countReply.result()));
+                            redisClient.lrange(keyListRange, 0, maxQueueItemCountIndex, new GetQueueItemsHandler(event, countReply.result()));
                         });
                         break;
-                    case addItem:
+                    case addQueueItem:
                         String key1 = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         String valueAddItem = event.body().getJsonObject(PAYLOAD).getString(BUFFER);
-                        redisClient.rpush(key1, valueAddItem, new AddItemHandler(event));
+                        redisClient.rpush(key1, valueAddItem, new AddQueueItemHandler(event));
                         break;
-                    case deleteItem:
+                    case deleteQueueItem:
                         String keyLset = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int indexLset = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
                         redisClient.lset(keyLset, indexLset, "TO_DELETE", event1 -> {
@@ -194,16 +194,16 @@ public class RedisQues extends AbstractVerticle {
                             }
                         });
                         break;
-                    case getItem:
+                    case getQueueItem:
                         String key = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int index = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
-                        redisClient.lindex(key, index, new GetItemHandler(event));
+                        redisClient.lindex(key, index, new GetQueueItemHandler(event));
                         break;
-                    case replaceItem:
+                    case replaceQueueItem:
                         String keyReplaceItem = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int indexReplaceItem = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
                         String bufferReplaceItem = event.body().getJsonObject(PAYLOAD).getString(BUFFER);
-                        redisClient.lset(keyReplaceItem, indexReplaceItem, bufferReplaceItem, new ReplaceItemHandler(event));
+                        redisClient.lset(keyReplaceItem, indexReplaceItem, bufferReplaceItem, new ReplaceQueueItemHandler(event));
                         break;
                     case deleteAllQueueItems:
                         redisClient.del(queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new DeleteAllQueueItems(event));
@@ -226,12 +226,12 @@ public class RedisQues extends AbstractVerticle {
                     case deleteLock:
                         redisClient.hdel(redisques_locks, event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new DeleteLockHandler(event));
                         break;
-                    case queueItemCount:
-                        redisClient.llen(queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new QueueItemCountHandler(event));
+                    case getQueueItemsCount:
+                        redisClient.llen(queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new GetQueueItemsCountHandler(event));
                         break;
-                    case queueCount:
+                    case getQueuesCount:
                         long timestamp = System.currentTimeMillis() - MAX_AGE_MILLISECONDS;
-                        redisClient.zcount(redisPrefix + "queues", timestamp, Double.MAX_VALUE, new QueueCountHandler(event));
+                        redisClient.zcount(redisPrefix + "queues", timestamp, Double.MAX_VALUE, new GetQueuesCountHandler(event));
                         break;
                     default:
                         unsupportedOperation(operation, event);

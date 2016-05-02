@@ -8,14 +8,14 @@ import io.vertx.core.json.JsonObject;
 import static org.swisspush.redisques.util.RedisquesAPI.*;
 
 /**
- * Class QueueCountHandler.
+ * Class GetQueuesCountHandler.
  *
  * @author https://github.com/mcweba [Marc-Andre Weber]
  */
-public class QueueCountHandler implements Handler<AsyncResult<Long>> {
+public class GetQueuesCountHandler implements Handler<AsyncResult<Long>> {
     private Message<JsonObject> event;
 
-    public QueueCountHandler(Message<JsonObject> event) {
+    public GetQueuesCountHandler(Message<JsonObject> event) {
         this.event = event;
     }
 

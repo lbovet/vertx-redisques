@@ -70,16 +70,16 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
-    public void getListRange(TestContext context) {
+    public void getQueueItems(TestContext context) {
         Async async = context.async();
         flushAll();
-        eventBusSend(buildOperation(QueueOperation.getListRange, new JsonObject().put(QUEUENAME, "queue1")), message -> {
+        eventBusSend(buildGetQueueItemsOperation("queue1", null), message -> {
             context.assertEquals(OK, message.result().body().getString(STATUS));
             context.assertEquals(0, message.result().body().getJsonArray(VALUE).size());
             eventBusSend(buildEnqueueOperation("queue1", "a_queue_item"), message1 -> {
                 context.assertEquals(OK, message1.result().body().getString(STATUS));
                 assertKeyCount(context, QUEUES_PREFIX, 1);
-                eventBusSend(buildOperation(QueueOperation.getListRange, new JsonObject().put(QUEUENAME, "queue1")), event -> {
+                eventBusSend(buildGetQueueItemsOperation("queue1", null), event -> {
                     context.assertEquals(OK, event.result().body().getString(STATUS));
                     context.assertEquals(1, event.result().body().getJsonArray(VALUE).size());
                     context.assertEquals("a_queue_item", event.result().body().getJsonArray(VALUE).getString(0));
@@ -92,7 +92,7 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
-    public void queueCount(TestContext context) {
+    public void getQueuesCount(TestContext context) {
         Async asyncEnqueue = context.async(100);
         flushAll();
         assertKeyCount(context, QUEUES_PREFIX, 0);
@@ -106,7 +106,7 @@ public class RedisQuesTest extends AbstractTestCase {
 
         assertKeyCount(context, QUEUES_PREFIX, 100);
         Async async = context.async();
-        eventBusSend(buildQueueCountOperation(), message -> {
+        eventBusSend(buildGetQueuesCountOperation(), message -> {
             context.assertEquals(OK, message.result().body().getString(STATUS));
             context.assertEquals(100L, message.result().body().getLong(VALUE));
             async.complete();
@@ -114,7 +114,7 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
-    public void queueItemCount(TestContext context) {
+    public void getQueueItemsCount(TestContext context) {
         Async async = context.async();
         flushAll();
         assertKeyCount(context, QUEUES_PREFIX, 0);
@@ -124,7 +124,7 @@ public class RedisQuesTest extends AbstractTestCase {
         }
         assertKeyCount(context, QUEUES_PREFIX, 1);
         context.assertEquals(100L, jedis.llen(QUEUES_PREFIX + queue));
-        eventBusSend(buildQueueItemCountOperation(queue), message -> {
+        eventBusSend(buildGetQueueItemsCountOperation(queue), message -> {
             context.assertEquals(OK, message.result().body().getString(STATUS));
             context.assertEquals(100L, message.result().body().getLong(VALUE));
             async.complete();
@@ -149,11 +149,11 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
-    public void addItem(TestContext context) {
+    public void addQueueItem(TestContext context) {
         Async async = context.async();
         flushAll();
         assertKeyCount(context, QUEUES_PREFIX, 0);
-        eventBusSend(buildAddItemOperation("queue2", "fooBar"), message -> {
+        eventBusSend(buildAddQueueItemOperation("queue2", "fooBar"), message -> {
             context.assertEquals(OK, message.result().body().getString(STATUS));
             assertKeyCount(context, QUEUES_PREFIX, 1);
             context.assertEquals("fooBar", jedis.lindex(QUEUES_PREFIX + "queue2", 0));
@@ -162,15 +162,15 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
-    public void getListRangeWithQueueSizeInformation(TestContext context) {
+    public void getQueueItemsWithQueueSizeInformation(TestContext context) {
         Async async = context.async();
         flushAll();
         assertKeyCount(context, QUEUES_PREFIX, 0);
-        eventBusSend(buildAddItemOperation("queue2", "fooBar"), message -> {
-            eventBusSend(buildAddItemOperation("queue2", "fooBar2"), message1 -> {
-                eventBusSend(buildAddItemOperation("queue2", "fooBar3"), message2 -> {
+        eventBusSend(buildAddQueueItemOperation("queue2", "fooBar"), message -> {
+            eventBusSend(buildAddQueueItemOperation("queue2", "fooBar2"), message1 -> {
+                eventBusSend(buildAddQueueItemOperation("queue2", "fooBar3"), message2 -> {
                     context.assertEquals(OK, message2.result().body().getString(STATUS));
-                    eventBusSend(buildGetListRangeOperation("queue2", "2"), event -> {
+                    eventBusSend(buildGetQueueItemsOperation("queue2", "2"), event -> {
                         context.assertEquals(OK, event.result().body().getString(STATUS));
                         context.assertEquals(2, event.result().body().getJsonArray(VALUE).size());
                         context.assertEquals(2, event.result().body().getJsonArray(INFO).getInteger(0));
@@ -183,18 +183,18 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
-    public void getItem(TestContext context) {
+    public void getQueueItem(TestContext context) {
         Async async = context.async();
         flushAll();
         assertKeyCount(context, QUEUES_PREFIX, 0);
-        eventBusSend(buildGetItemOperation("queue1", 0), message -> {
+        eventBusSend(buildGetQueueItemOperation("queue1", 0), message -> {
             context.assertEquals(ERROR, message.result().body().getString(STATUS));
             context.assertNull(message.result().body().getString(VALUE));
-            eventBusSend(buildAddItemOperation("queue1", "fooBar"), message1 -> {
+            eventBusSend(buildAddQueueItemOperation("queue1", "fooBar"), message1 -> {
                 context.assertEquals(OK, message1.result().body().getString(STATUS));
                 assertKeyCount(context, QUEUES_PREFIX, 1);
                 context.assertEquals("fooBar", jedis.lindex(QUEUES_PREFIX + "queue1", 0));
-                eventBusSend(buildGetItemOperation("queue1", 0), message2 -> {
+                eventBusSend(buildGetQueueItemOperation("queue1", 0), message2 -> {
                     context.assertEquals(OK, message2.result().body().getString(STATUS));
                     context.assertEquals("fooBar", message2.result().body().getString("value"));
                     async.complete();
@@ -204,14 +204,14 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
-    public void replaceItem(TestContext context) {
+    public void replaceQueueItem(TestContext context) {
         Async async = context.async();
         flushAll();
-        eventBusSend(buildAddItemOperation("queue1", "foo"), message -> {
+        eventBusSend(buildAddQueueItemOperation("queue1", "foo"), message -> {
             context.assertEquals(OK, message.result().body().getString(STATUS));
             assertKeyCount(context, QUEUES_PREFIX, 1);
             context.assertEquals("foo", jedis.lindex(QUEUES_PREFIX + "queue1", 0));
-            eventBusSend(buildReplaceItemOperation("queue1", 0, "bar"), message1 -> {
+            eventBusSend(buildReplaceQueueItemOperation("queue1", 0, "bar"), message1 -> {
                 context.assertEquals(OK, message1.result().body().getString(STATUS));
                 context.assertEquals("bar", jedis.lindex(QUEUES_PREFIX + "queue1", 0));
                 async.complete();
@@ -220,16 +220,16 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
-    public void deleteItem(TestContext context) {
+    public void deleteQueueItem(TestContext context) {
         Async async = context.async();
         flushAll();
         assertKeyCount(context, QUEUES_PREFIX + "queue1", 0);
-        eventBusSend(buildDeleteItemOperation("queue1", 0), message -> {
+        eventBusSend(buildDeleteQueueItemOperation("queue1", 0), message -> {
             context.assertEquals(ERROR, message.result().body().getString(STATUS));
-            eventBusSend(buildAddItemOperation("queue1", "foo"), message2 -> {
+            eventBusSend(buildAddQueueItemOperation("queue1", "foo"), message2 -> {
                 context.assertEquals(OK, message2.result().body().getString(STATUS));
                 assertKeyCount(context, QUEUES_PREFIX + "queue1", 1);
-                eventBusSend(buildDeleteItemOperation("queue1", 0), message3 -> {
+                eventBusSend(buildDeleteQueueItemOperation("queue1", 0), message3 -> {
                     context.assertEquals(OK, message3.result().body().getString(STATUS));
                     assertKeyCount(context, QUEUES_PREFIX + "queue1", 0);
                     async.complete();
@@ -377,7 +377,7 @@ public class RedisQuesTest extends AbstractTestCase {
         for (int i = 0; i < 250; i++) {
             jedis.rpush(QUEUES_PREFIX + "testLock1", "testItem"+i);
         }
-        eventBusSend(buildGetListRangeOperation("testLock1", "178"), message -> {
+        eventBusSend(buildGetQueueItemsOperation("testLock1", "178"), message -> {
             context.assertEquals(OK, message.result().body().getString(STATUS));
             context.assertEquals(178, message.result().body().getJsonArray(VALUE).size());
             context.assertEquals(178, message.result().body().getJsonArray(INFO).getInteger(0));

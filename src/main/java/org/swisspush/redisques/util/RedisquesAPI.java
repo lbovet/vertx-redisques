@@ -24,9 +24,9 @@ public class RedisquesAPI {
     public static final String NO_SUCH_LOCK = "No such lock";
 
     public enum QueueOperation {
-        enqueue, check, reset, stop, getListRange, addItem, deleteItem,
-        getItem, replaceItem, deleteAllQueueItems, getAllLocks, putLock,
-        getLock, deleteLock, queueCount, queueItemCount;
+        enqueue, check, reset, stop, getQueueItems, addQueueItem, deleteQueueItem,
+        getQueueItem, replaceQueueItem, deleteAllQueueItems, getAllLocks, putLock,
+        getLock, deleteLock, getQueuesCount, getQueueItemsCount;
 
         public static QueueOperation fromString(String op){
             for (QueueOperation queueOperation : values()) {
@@ -60,36 +60,36 @@ public class RedisquesAPI {
         return operation;
     }
 
-    public static JsonObject buildGetListRangeOperation(String queueName, String limit){
-        return buildOperation(QueueOperation.getListRange, new JsonObject().put(QUEUENAME, queueName).put("limit", limit));
+    public static JsonObject buildGetQueueItemsOperation(String queueName, String limit){
+        return buildOperation(QueueOperation.getQueueItems, new JsonObject().put(QUEUENAME, queueName).put("limit", limit));
     }
 
-    public static JsonObject buildAddItemOperation(String queueName, String buffer){
-        return buildOperation(QueueOperation.addItem, new JsonObject().put(QUEUENAME, queueName).put("buffer", buffer));
+    public static JsonObject buildAddQueueItemOperation(String queueName, String buffer){
+        return buildOperation(QueueOperation.addQueueItem, new JsonObject().put(QUEUENAME, queueName).put("buffer", buffer));
     }
 
-    public static JsonObject buildGetItemOperation(String queueName, int index){
-        return buildOperation(QueueOperation.getItem, new JsonObject().put(QUEUENAME, queueName).put("index", index));
+    public static JsonObject buildGetQueueItemOperation(String queueName, int index){
+        return buildOperation(QueueOperation.getQueueItem, new JsonObject().put(QUEUENAME, queueName).put("index", index));
     }
 
-    public static JsonObject buildReplaceItemOperation(String queueName, int index, String buffer){
-        return buildOperation(QueueOperation.replaceItem, new JsonObject().put(QUEUENAME, queueName).put("index", index).put("buffer", buffer));
+    public static JsonObject buildReplaceQueueItemOperation(String queueName, int index, String buffer){
+        return buildOperation(QueueOperation.replaceQueueItem, new JsonObject().put(QUEUENAME, queueName).put("index", index).put("buffer", buffer));
     }
 
-    public static JsonObject buildDeleteItemOperation(String queueName, int index){
-        return buildOperation(QueueOperation.deleteItem, new JsonObject().put(QUEUENAME, queueName).put("index", index));
+    public static JsonObject buildDeleteQueueItemOperation(String queueName, int index){
+        return buildOperation(QueueOperation.deleteQueueItem, new JsonObject().put(QUEUENAME, queueName).put("index", index));
     }
 
     public static JsonObject buildDeleteAllQueueItemsOperation(String queueName){
         return buildOperation(QueueOperation.deleteAllQueueItems, new JsonObject().put(QUEUENAME, queueName));
     }
 
-    public static JsonObject buildQueueCountOperation(){
-        return buildOperation(QueueOperation.queueCount);
+    public static JsonObject buildGetQueuesCountOperation(){
+        return buildOperation(QueueOperation.getQueuesCount);
     }
 
-    public static JsonObject buildQueueItemCountOperation(String queueName){
-        return buildOperation(QueueOperation.queueItemCount, new JsonObject().put(QUEUENAME, queueName));
+    public static JsonObject buildGetQueueItemsCountOperation(String queueName){
+        return buildOperation(QueueOperation.getQueueItemsCount, new JsonObject().put(QUEUENAME, queueName));
     }
 
     public static JsonObject buildGetLockOperation(String queueName){
