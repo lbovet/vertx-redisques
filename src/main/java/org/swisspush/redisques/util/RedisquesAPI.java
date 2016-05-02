@@ -105,6 +105,6 @@ public class RedisquesAPI {
     }
 
     public static JsonObject buildGetAllLocksOperation(){
-        return buildOperation(QueueOperation.getAllLocks, new JsonObject());
+        return buildOperation(QueueOperation.getAllLocks);
     }
 }
