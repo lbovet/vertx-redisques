@@ -188,6 +188,24 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
+    public void addQueueItemWithLegacyOperationName(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+
+        JsonObject op = new JsonObject();
+        op.put(OPERATION, "addItem");
+        op.put(PAYLOAD, new JsonObject().put(QUEUENAME, "queue2").put("buffer", "fooBar"));
+
+        eventBusSend(op, message -> {
+            context.assertEquals(OK, message.result().body().getString(STATUS));
+            assertKeyCount(context, QUEUES_PREFIX, 1);
+            context.assertEquals("fooBar", jedis.lindex(QUEUES_PREFIX + "queue2", 0));
+            async.complete();
+        });
+    }
+
+    @Test
     public void getQueueItemsWithQueueSizeInformation(TestContext context) {
         Async async = context.async();
         flushAll();
@@ -238,6 +256,27 @@ public class RedisQuesTest extends AbstractTestCase {
             assertKeyCount(context, QUEUES_PREFIX, 1);
             context.assertEquals("foo", jedis.lindex(QUEUES_PREFIX + "queue1", 0));
             eventBusSend(buildReplaceQueueItemOperation("queue1", 0, "bar"), message1 -> {
+                context.assertEquals(OK, message1.result().body().getString(STATUS));
+                context.assertEquals("bar", jedis.lindex(QUEUES_PREFIX + "queue1", 0));
+                async.complete();
+            });
+        });
+    }
+
+    @Test
+    public void replaceQueueItemWithLegacyOperationName(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        eventBusSend(buildAddQueueItemOperation("queue1", "foo"), message -> {
+            context.assertEquals(OK, message.result().body().getString(STATUS));
+            assertKeyCount(context, QUEUES_PREFIX, 1);
+            context.assertEquals("foo", jedis.lindex(QUEUES_PREFIX + "queue1", 0));
+
+            JsonObject op = new JsonObject();
+            op.put(OPERATION, "replaceItem");
+            op.put(PAYLOAD, new JsonObject().put(QUEUENAME, "queue1").put("index", 0).put("buffer", "bar"));
+
+            eventBusSend(op, message1 -> {
                 context.assertEquals(OK, message1.result().body().getString(STATUS));
                 context.assertEquals("bar", jedis.lindex(QUEUES_PREFIX + "queue1", 0));
                 async.complete();
