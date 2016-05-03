@@ -1,6 +1,9 @@
 package org.swisspush.redisques.util;
 
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+import org.swisspush.redisques.RedisQues;
 
 /**
  * Class RedisquesAPI listing the operations and response values which are supported in Redisques.
@@ -23,14 +26,47 @@ public class RedisquesAPI {
     public static final String REQUESTED_BY = "requestedBy";
     public static final String NO_SUCH_LOCK = "No such lock";
 
+    private static Logger log = LoggerFactory.getLogger(RedisquesAPI.class);
+
     public enum QueueOperation {
-        enqueue, check, reset, stop, getQueueItems, addQueueItem, deleteQueueItem,
-        getQueueItem, replaceQueueItem, deleteAllQueueItems, getAllLocks, putLock,
-        getLock, deleteLock, getQueues, getQueuesCount, getQueueItemsCount;
+        enqueue(null),
+        check(null),
+        reset(null),
+        stop(null),
+        getQueueItems("getListRange"),
+        addQueueItem("addItem"),
+        deleteQueueItem("deleteItem"),
+        getQueueItem("getItem"),
+        replaceQueueItem("replaceItem"),
+        deleteAllQueueItems(null),
+        getAllLocks(null),
+        putLock(null),
+        getLock(null),
+        deleteLock(null),
+        getQueues(null),
+        getQueuesCount(null),
+        getQueueItemsCount(null);
+
+        private final String legacyName;
+
+        QueueOperation(String legacyName){
+            this.legacyName = legacyName;
+        }
+
+        public String getLegacyName() {
+            return legacyName;
+        }
+
+        public boolean hasLegacyName(){
+            return legacyName != null;
+        }
 
         public static QueueOperation fromString(String op){
             for (QueueOperation queueOperation : values()) {
                 if(queueOperation.name().equalsIgnoreCase(op)){
+                    return queueOperation;
+                } else if(queueOperation.hasLegacyName() && queueOperation.getLegacyName().equalsIgnoreCase(op)){
+                    log.warn("Legacy queue operation used. This may be removed in future releases. Use '"+queueOperation.name()+"' instead of '" + queueOperation.getLegacyName() + "'");
                     return queueOperation;
                 }
             }
