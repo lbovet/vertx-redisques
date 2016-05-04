@@ -451,11 +451,13 @@ public class RedisQues extends AbstractVerticle {
                             });
                         });
                     } else {
-                        // Failed. Message will be kept in queue and
-                        // retried at next wakeup.
+                        // Failed. Message will be kept in queue and retried later
                         log.debug("RedisQues Processing failed for queue " + queue);
                         myQueues.put(queue, QueueState.READY);
                         vertx.cancelTimer(sendResult.timeoutId);
+                        vertx.setTimer(refreshPeriod * 1000, timerId -> {
+                            notifyConsumer(queue);
+                        });
                     }
                 });
             } else {
