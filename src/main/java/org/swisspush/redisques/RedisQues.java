@@ -455,9 +455,7 @@ public class RedisQues extends AbstractVerticle {
                         log.debug("RedisQues Processing failed for queue " + queue);
                         myQueues.put(queue, QueueState.READY);
                         vertx.cancelTimer(sendResult.timeoutId);
-                        vertx.setTimer(refreshPeriod * 1000, timerId -> {
-                            notifyConsumer(queue);
-                        });
+                        rescheduleSendMessageAfterFailure(queue);
                     }
                 });
             } else {
@@ -465,6 +463,12 @@ public class RedisQues extends AbstractVerticle {
                 log.debug("Got a request to consume from empty queue " + queue);
                 myQueues.put(queue, QueueState.READY);
             }
+        });
+    }
+
+    private void rescheduleSendMessageAfterFailure(final String queue) {
+        vertx.setTimer(refreshPeriod * 1000, timerId -> {
+            notifyConsumer(queue);
         });
     }
 
