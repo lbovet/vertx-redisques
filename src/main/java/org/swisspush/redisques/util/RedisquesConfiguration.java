@@ -1,6 +1,8 @@
 package org.swisspush.redisques.util;
 
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 
 /**
  * Utility class to configure the Redisques module.
@@ -15,6 +17,9 @@ public class RedisquesConfiguration {
     private String redisHost;
     private int redisPort;
     private String redisEncoding;
+    private int cleanupInterval;
+
+    private static final int DEFAULT_CLEANUP_INTERVAL = 60; // 60s
 
     public static final String PROP_ADDRESS = "address";
     public static final String PROP_REDIS_PREFIX = "redis-prefix";
@@ -23,6 +28,9 @@ public class RedisquesConfiguration {
     public static final String PROP_REDIS_HOST = "redisHost";
     public static final String PROP_REDIS_PORT = "redisPort";
     public static final String PROP_REDIS_ENCODING = "redisEncoding";
+    public static final String PROP_CLEANUP_INTERVAL = "cleanupInterval";
+
+    private Logger log = LoggerFactory.getLogger(RedisquesConfiguration.class);
 
     /**
      * Constructor with default values. Use the {@link RedisquesConfigurationBuilder} class
@@ -34,6 +42,11 @@ public class RedisquesConfiguration {
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
                                   String redisHost, int redisPort, String redisEncoding) {
+        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, DEFAULT_CLEANUP_INTERVAL);
+    }
+
+    public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
+                                  String redisHost, int redisPort, String redisEncoding, int cleanupInterval) {
         this.address = address;
         this.redisPrefix = redisPrefix;
         this.processorAddress = processorAddress;
@@ -41,6 +54,13 @@ public class RedisquesConfiguration {
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.redisEncoding = redisEncoding;
+
+        if(cleanupInterval > 0){
+            this.cleanupInterval = cleanupInterval;
+        } else {
+            log.warn("Overriden cleanupInterval of " + cleanupInterval + "s is not valid. Using default value of " + DEFAULT_CLEANUP_INTERVAL + "s instead.");
+            this.cleanupInterval = DEFAULT_CLEANUP_INTERVAL;
+        }
     }
 
     public static RedisquesConfigurationBuilder with(){
@@ -49,7 +69,7 @@ public class RedisquesConfiguration {
 
     private RedisquesConfiguration(RedisquesConfigurationBuilder builder){
         this(builder.address, builder.redisPrefix, builder.processorAddress, builder.refreshPeriod,
-                builder.redisHost, builder.redisPort, builder.redisEncoding);
+                builder.redisHost, builder.redisPort, builder.redisEncoding, builder.cleanupInterval);
     }
 
     public JsonObject asJsonObject(){
@@ -61,6 +81,7 @@ public class RedisquesConfiguration {
         obj.put(PROP_REDIS_HOST, getRedisHost());
         obj.put(PROP_REDIS_PORT, getRedisPort());
         obj.put(PROP_REDIS_ENCODING, getRedisEncoding());
+        obj.put(PROP_CLEANUP_INTERVAL, getCleanupInterval());
         return obj;
     }
 
@@ -87,6 +108,9 @@ public class RedisquesConfiguration {
         if(json.containsKey(PROP_REDIS_ENCODING)){
             builder.redisEncoding(json.getString(PROP_REDIS_ENCODING));
         }
+        if(json.containsKey(PROP_CLEANUP_INTERVAL)){
+            builder.cleanupInterval(json.getInteger(PROP_CLEANUP_INTERVAL));
+        }
         return builder.build();
     }
 
@@ -110,8 +134,17 @@ public class RedisquesConfiguration {
         return redisHost;
     }
 
-    public int getRedisPort() {
-        return redisPort;
+    public int getRedisPort() { return redisPort; }
+
+    public int getCleanupInterval() { return cleanupInterval; }
+
+    /**
+     * Gets the value for the vertx periodic timer.
+     * This value is half of {@link RedisquesConfiguration#getCleanupInterval()} in ms plus an additional 500ms.
+     * @return the interval for the vertx periodic timer
+     */
+    public int getCleanupIntervalTimerMs() {
+        return ((cleanupInterval * 1000) / 2) + 500;
     }
 
     public String getRedisEncoding() {
@@ -142,6 +175,7 @@ public class RedisquesConfiguration {
         private String redisHost;
         private int redisPort;
         private String redisEncoding;
+        private int cleanupInterval;
 
         public RedisquesConfigurationBuilder(){
             this.address = "redisques";
@@ -151,6 +185,7 @@ public class RedisquesConfiguration {
             this.redisHost = "localhost";
             this.redisPort = 6379;
             this.redisEncoding = "UTF-8";
+            this.cleanupInterval = DEFAULT_CLEANUP_INTERVAL; //60s
         }
 
         public RedisquesConfigurationBuilder address(String address){
@@ -185,6 +220,11 @@ public class RedisquesConfiguration {
 
         public RedisquesConfigurationBuilder redisEncoding(String redisEncoding){
             this.redisEncoding = redisEncoding;
+            return this;
+        }
+
+        public RedisquesConfigurationBuilder cleanupInterval(int cleanupInterval){
+            this.cleanupInterval = cleanupInterval;
             return this;
         }
 
