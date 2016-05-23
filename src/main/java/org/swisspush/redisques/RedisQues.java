@@ -17,6 +17,7 @@ import org.swisspush.redisques.handler.*;
 import org.swisspush.redisques.util.RedisquesConfiguration;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -358,7 +359,25 @@ public class RedisQues extends AbstractVerticle {
         if (log.isTraceEnabled()) {
             log.trace("RedisQues reset consumers keys: " + keysPattern);
         }
-        redisClient.keys(keysPattern, event -> {});
+        redisClient.keys(keysPattern, keysResult -> {
+            if(keysResult.failed()) {
+                log.error("Unable to get redis keys of consumers");
+                return;
+            }
+            List keys = keysResult.result().getList();
+            if(keys == null || keys.size() < 1) {
+                log.debug("No consumers found to reset");
+                return;
+            }
+            redisClient.delMany(keys, delManyResult -> {
+                if (delManyResult.succeeded()) {
+                    Long count = delManyResult.result();
+                    log.debug("Successfully reset " + count + " consumers");
+                } else {
+                    log.error("Unable to delete redis keys of consumers");
+                }
+            });
+        });
     }
 
     private void consume(final String queue) {
