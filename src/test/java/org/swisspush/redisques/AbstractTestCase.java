@@ -42,8 +42,9 @@ public abstract class AbstractTestCase {
     @Rule
     public Timeout rule = Timeout.seconds(5);
 
-    static Vertx vertx;
     static Logger log = LoggerFactory.getLogger(AbstractTestCase.class);
+
+    protected static Vertx vertx;
     protected static Jedis jedis;
 
     protected void flushAll(){
