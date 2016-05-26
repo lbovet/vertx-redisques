@@ -2,7 +2,6 @@ apply plugin: 'idea'
 apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'signing'
-apply plugin: 'com.github.johnrengelman.shadow'
 
 if (!project.hasProperty('repoUsername')) {
     ext.repoUsername = 'randomUsername'
@@ -38,24 +37,7 @@ repositories {
     mavenCentral()
 }
 
-buildscript {
-    repositories {
 
-        try {
-            maven { url "$repository" }
-            println 'use custom plugin repository: ' + "$repository"
-        } catch(Exception e) {
-            maven { url "https://plugins.gradle.org/m2/" }
-            println 'use standard plugin repository'
-        }
-        maven {
-            url "http://artifactory.pnet.ch/artifactory/swisspost/"
-        }
-    }
-    dependencies {
-        classpath "com.github.jengelman.gradle.plugins:shadow:1.2.3"
-    }
-}
 
 dependencies {
     testRuntime 'com.github.kstyrc:embedded-redis:0.6'
