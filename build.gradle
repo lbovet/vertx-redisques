@@ -99,15 +99,8 @@ javadocJar.onlyIf { upload }
 
 build.dependsOn sourceJar, javadocJar
 
-shadowJar {
-    manifest {
-        attributes 'Main-Class': 'io.vertx.core.Starter'
-        attributes 'Main-Verticle': 'org.swisspush.reststorage.RestStorageMod'
-    }
-}
-
 artifacts {
-    archives jar, sourceJar, javadocJar, shadowJar
+    archives jar, sourceJar, javadocJar
 }
 signing {
     required { uploadToMavenCentral }
