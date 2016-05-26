@@ -14,12 +14,10 @@ import io.vertx.redis.RedisClient;
 import io.vertx.redis.RedisOptions;
 import io.vertx.redis.op.RangeLimitOptions;
 import org.swisspush.redisques.handler.*;
+import org.swisspush.redisques.lua.*;
 import org.swisspush.redisques.util.RedisquesConfiguration;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.swisspush.redisques.util.RedisquesAPI.*;
@@ -65,6 +63,8 @@ public class RedisQues extends AbstractVerticle {
 
     private String redisques_locks = "redisques:locks";
 
+    private String queue_cleanup_lastexec = redisPrefix + "cleanup:lastexec";
+
     // Address of message processors
     private String processorAddress = "redisques-processor";
 
@@ -74,11 +74,15 @@ public class RedisQues extends AbstractVerticle {
     // consuming.
     private int refreshPeriod = 10;
 
+    private int cleanupInterval;
+
     // the time we wait for the processor to answer, before we cancel processing
     private int processorTimeout = 240000;
 
     private static final int DEFAULT_MAX_QUEUEITEM_COUNT = 49;
     private static final int MAX_AGE_MILLISECONDS = 120000; // 120 seconds
+
+    private LuaScriptManager luaScriptManager;
 
     // Handler receiving registration requests when no consumer is registered
     // for a queue.
@@ -117,11 +121,14 @@ public class RedisQues extends AbstractVerticle {
         redisPrefix = modConfig.getRedisPrefix();
         processorAddress = modConfig.getProcessorAddress();
         refreshPeriod = modConfig.getRefreshPeriod();
+        cleanupInterval = modConfig.getCleanupInterval();
 
         this.redisClient = RedisClient.create(vertx, new RedisOptions()
                 .setHost(modConfig.getRedisHost())
                 .setPort(modConfig.getRedisPort())
                 .setEncoding(modConfig.getRedisEncoding()));
+
+        this.luaScriptManager = new LuaScriptManager(redisClient);
 
         // Handles operations
         eb.localConsumer(address, new Handler<Message<JsonObject>>() {
@@ -174,9 +181,7 @@ public class RedisQues extends AbstractVerticle {
                     case getQueueItems:
                         String keyListRange = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                         int maxQueueItemCountIndex = getMaxQueueItemCountIndex(event.body().getJsonObject(PAYLOAD).getString(LIMIT));
-                        redisClient.llen(keyListRange, countReply -> {
-                            redisClient.lrange(keyListRange, 0, maxQueueItemCountIndex, new GetQueueItemsHandler(event, countReply.result()));
-                        });
+                        redisClient.llen(keyListRange, countReply -> redisClient.lrange(keyListRange, 0, maxQueueItemCountIndex, new GetQueueItemsHandler(event, countReply.result())));
                         break;
                     case addQueueItem:
                         String key1 = queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
@@ -275,6 +280,19 @@ public class RedisQues extends AbstractVerticle {
                         myQueues.remove(queue);
                     }
                 });
+            });
+        });
+
+        registerQueueCleanup(modConfig);
+    }
+
+    private void registerQueueCleanup(RedisquesConfiguration modConfig) {
+        vertx.setPeriodic(modConfig.getCleanupIntervalTimerMs(), periodicEvent -> {
+            luaScriptManager.handleQueueCleanup(queue_cleanup_lastexec, cleanupInterval, shouldCleanup -> {
+                if (shouldCleanup) {
+                    log.info("periodic queue cleanup is triggered now");
+                    checkQueues();
+                }
             });
         });
     }
@@ -486,9 +504,7 @@ public class RedisQues extends AbstractVerticle {
     }
 
     private void rescheduleSendMessageAfterFailure(final String queue) {
-        vertx.setTimer(refreshPeriod * 1000, timerId -> {
-            notifyConsumer(queue);
-        });
+        vertx.setTimer(refreshPeriod * 1000, timerId -> notifyConsumer(queue));
     }
 
     private void processMessageWithTimeout(final String queue, final String payload, final Handler<SendResult> handler) {
@@ -575,7 +591,7 @@ public class RedisQues extends AbstractVerticle {
     /**
      * Stores the queue name in a sorted set with the current date as score.
      *
-     * @param queue
+     * @param queue the name of the queue
      * @param handler (optional) To get informed when done.
      */
     private void updateTimestamp(final String queue, Handler<AsyncResult<Long>> handler) {
@@ -642,7 +658,7 @@ public class RedisQues extends AbstractVerticle {
     /**
      * Remove queues from the sorted set that are timestamped before a limit time.
      *
-     * @param limit
+     * @param limit limit timestamp
      */
     private void removeOldQueues(long limit) {
         log.debug("Cleaning old queues");

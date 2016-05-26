@@ -31,10 +31,11 @@ The following configuration values are available:
 | address | redisques | The eventbus address the redisques module is listening to |
 | redis-prefix | redisques: | Prefix for redis keys holding queues and consumers |
 | processor-address | redisques-processor | Address of message processors |
-| refresh-period | 10 | The frequency of consumers refreshing their subscriptions to consume |
+| refresh-period | 10 | The frequency [s] of consumers refreshing their subscriptions to consume |
 | redisHost | localhost | The host where redis is running on |
 | redisPort | 6379 | The port where redis is running on |
 | redisEncoding | UTF-8 | The encoding to use in redis |
+| cleanupInterval | 60 | The interval [s] to cleanup timestamps of not-active / empty queues by executing **check** queue operation. _cleanupInterval_ value must be greater 0, otherwise the default is used. |
 
 ### Configuration util
 

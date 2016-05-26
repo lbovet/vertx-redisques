@@ -3,7 +3,6 @@ package org.swisspush.redisques.util;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import org.swisspush.redisques.RedisQues;
 
 /**
  * Class RedisquesAPI listing the operations and response values which are supported in Redisques.

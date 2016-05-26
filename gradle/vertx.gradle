@@ -69,6 +69,10 @@ dependencies {
     provided "io.vertx:vertx-redis-client:$vertxVersion"
     provided "org.springframework:spring-core:4.1.6.RELEASE"
 
+    compile "commons-codec:commons-codec:$commonscodecVersion"
+
+    runtime "commons-codec:commons-codec:$commonscodecVersion"
+
     testCompile "junit:junit:$junitVersion"
     testCompile "io.vertx:vertx-unit:$vertxVersion"
     testCompile 'com.github.kstyrc:embedded-redis:0.6'
