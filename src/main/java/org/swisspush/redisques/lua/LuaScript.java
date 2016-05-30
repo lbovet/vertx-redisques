@@ -1,7 +1,7 @@
 package org.swisspush.redisques.lua;
 
 public enum LuaScript {
-    CLEANUP("redisques_cleanup.lua");
+    CHECK("redisques_check.lua");
 
     private String file;
 

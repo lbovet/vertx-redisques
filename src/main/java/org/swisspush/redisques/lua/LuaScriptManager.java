@@ -21,9 +21,9 @@ public class LuaScriptManager {
     public LuaScriptManager(RedisClient redisClient){
         this.redisClient = redisClient;
 
-        LuaScriptState luaGetScriptState = new LuaScriptState(LuaScript.CLEANUP, redisClient);
+        LuaScriptState luaGetScriptState = new LuaScriptState(LuaScript.CHECK, redisClient);
         luaGetScriptState.loadLuaScript(new RedisCommandDoNothing(), 0);
-        luaScripts.put(LuaScript.CLEANUP, luaGetScriptState);
+        luaScripts.put(LuaScript.CHECK, luaGetScriptState);
     }
 
     /**
@@ -38,23 +38,23 @@ public class LuaScriptManager {
         redisCommand.exec(executionCounter);
     }
 
-    public void handleQueueCleanup(String lastCleanupExecKey, int cleanupInterval, Handler<Boolean> handler){
-        List<String> keys = Collections.singletonList(lastCleanupExecKey);
+    public void handleQueueCheck(String lastCheckExecKey, int checkInterval, Handler<Boolean> handler){
+        List<String> keys = Collections.singletonList(lastCheckExecKey);
         List<String> arguments = Arrays.asList(
                 String.valueOf(System.currentTimeMillis()),
-                String.valueOf(cleanupInterval)
+                String.valueOf(checkInterval)
         );
-        executeRedisCommand(new Cleanup(keys, arguments, redisClient, handler), 0);
+        executeRedisCommand(new Check(keys, arguments, redisClient, handler), 0);
     }
 
-    private class Cleanup implements RedisCommand {
+    private class Check implements RedisCommand {
 
         private List<String> keys;
         private List<String> arguments;
         private Handler<Boolean> handler;
         private RedisClient redisClient;
 
-        public Cleanup(List<String> keys, List<String> arguments, RedisClient redisClient, final Handler<Boolean> handler) {
+        public Check(List<String> keys, List<String> arguments, RedisClient redisClient, final Handler<Boolean> handler) {
             this.keys = keys;
             this.arguments = arguments;
             this.redisClient = redisClient;
@@ -63,25 +63,25 @@ public class LuaScriptManager {
 
         @Override
         public void exec(int executionCounter) {
-            redisClient.evalsha(luaScripts.get(LuaScript.CLEANUP).getSha(), keys, arguments, event -> {
+            redisClient.evalsha(luaScripts.get(LuaScript.CHECK).getSha(), keys, arguments, event -> {
                 if(event.succeeded()){
                     Long value = event.result().getLong(0);
                     if (log.isTraceEnabled()) {
-                        log.trace("Cleanup lua script got result: " + value);
+                        log.trace("Check lua script got result: " + value);
                     }
                     handler.handle(value == 1L);
                 } else {
                     String message = event.cause().getMessage();
                     if(message != null && message.startsWith("NOSCRIPT")) {
-                        log.warn("cleanup script couldn't be found, reload it");
+                        log.warn("Check script couldn't be found, reload it");
                         log.warn("amount the script got loaded: " + String.valueOf(executionCounter));
                         if(executionCounter > 10) {
                             log.error("amount the script got loaded is higher than 10, we abort");
                         } else {
-                            luaScripts.get(LuaScript.CLEANUP).loadLuaScript(new Cleanup(keys, arguments, redisClient, handler), executionCounter);
+                            luaScripts.get(LuaScript.CHECK).loadLuaScript(new Check(keys, arguments, redisClient, handler), executionCounter);
                         }
                     } else {
-                        log.error("Cleanup request failed with message: " + message);
+                        log.error("Check request failed with message: " + message);
                     }
                 }
             });

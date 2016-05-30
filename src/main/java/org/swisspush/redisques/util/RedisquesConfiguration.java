@@ -17,9 +17,9 @@ public class RedisquesConfiguration {
     private String redisHost;
     private int redisPort;
     private String redisEncoding;
-    private int cleanupInterval;
+    private int checkInterval;
 
-    private static final int DEFAULT_CLEANUP_INTERVAL = 60; // 60s
+    private static final int DEFAULT_CHECK_INTERVAL = 60; // 60s
 
     public static final String PROP_ADDRESS = "address";
     public static final String PROP_REDIS_PREFIX = "redis-prefix";
@@ -28,7 +28,7 @@ public class RedisquesConfiguration {
     public static final String PROP_REDIS_HOST = "redisHost";
     public static final String PROP_REDIS_PORT = "redisPort";
     public static final String PROP_REDIS_ENCODING = "redisEncoding";
-    public static final String PROP_CLEANUP_INTERVAL = "cleanupInterval";
+    public static final String PROP_CHECK_INTERVAL = "checkInterval";
 
     private Logger log = LoggerFactory.getLogger(RedisquesConfiguration.class);
 
@@ -42,11 +42,11 @@ public class RedisquesConfiguration {
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
                                   String redisHost, int redisPort, String redisEncoding) {
-        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, DEFAULT_CLEANUP_INTERVAL);
+        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, DEFAULT_CHECK_INTERVAL);
     }
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
-                                  String redisHost, int redisPort, String redisEncoding, int cleanupInterval) {
+                                  String redisHost, int redisPort, String redisEncoding, int checkInterval) {
         this.address = address;
         this.redisPrefix = redisPrefix;
         this.processorAddress = processorAddress;
@@ -55,11 +55,11 @@ public class RedisquesConfiguration {
         this.redisPort = redisPort;
         this.redisEncoding = redisEncoding;
 
-        if(cleanupInterval > 0){
-            this.cleanupInterval = cleanupInterval;
+        if(checkInterval > 0){
+            this.checkInterval = checkInterval;
         } else {
-            log.warn("Overriden cleanupInterval of " + cleanupInterval + "s is not valid. Using default value of " + DEFAULT_CLEANUP_INTERVAL + "s instead.");
-            this.cleanupInterval = DEFAULT_CLEANUP_INTERVAL;
+            log.warn("Overriden checkInterval of " + checkInterval + "s is not valid. Using default value of " + DEFAULT_CHECK_INTERVAL + "s instead.");
+            this.checkInterval = DEFAULT_CHECK_INTERVAL;
         }
     }
 
@@ -69,7 +69,7 @@ public class RedisquesConfiguration {
 
     private RedisquesConfiguration(RedisquesConfigurationBuilder builder){
         this(builder.address, builder.redisPrefix, builder.processorAddress, builder.refreshPeriod,
-                builder.redisHost, builder.redisPort, builder.redisEncoding, builder.cleanupInterval);
+                builder.redisHost, builder.redisPort, builder.redisEncoding, builder.checkInterval);
     }
 
     public JsonObject asJsonObject(){
@@ -81,7 +81,7 @@ public class RedisquesConfiguration {
         obj.put(PROP_REDIS_HOST, getRedisHost());
         obj.put(PROP_REDIS_PORT, getRedisPort());
         obj.put(PROP_REDIS_ENCODING, getRedisEncoding());
-        obj.put(PROP_CLEANUP_INTERVAL, getCleanupInterval());
+        obj.put(PROP_CHECK_INTERVAL, getCheckInterval());
         return obj;
     }
 
@@ -108,8 +108,8 @@ public class RedisquesConfiguration {
         if(json.containsKey(PROP_REDIS_ENCODING)){
             builder.redisEncoding(json.getString(PROP_REDIS_ENCODING));
         }
-        if(json.containsKey(PROP_CLEANUP_INTERVAL)){
-            builder.cleanupInterval(json.getInteger(PROP_CLEANUP_INTERVAL));
+        if(json.containsKey(PROP_CHECK_INTERVAL)){
+            builder.checkInterval(json.getInteger(PROP_CHECK_INTERVAL));
         }
         return builder.build();
     }
@@ -136,15 +136,15 @@ public class RedisquesConfiguration {
 
     public int getRedisPort() { return redisPort; }
 
-    public int getCleanupInterval() { return cleanupInterval; }
+    public int getCheckInterval() { return checkInterval; }
 
     /**
      * Gets the value for the vertx periodic timer.
-     * This value is half of {@link RedisquesConfiguration#getCleanupInterval()} in ms plus an additional 500ms.
+     * This value is half of {@link RedisquesConfiguration#getCheckInterval()} in ms plus an additional 500ms.
      * @return the interval for the vertx periodic timer
      */
-    public int getCleanupIntervalTimerMs() {
-        return ((cleanupInterval * 1000) / 2) + 500;
+    public int getCheckIntervalTimerMs() {
+        return ((checkInterval * 1000) / 2) + 500;
     }
 
     public String getRedisEncoding() {
@@ -175,7 +175,7 @@ public class RedisquesConfiguration {
         private String redisHost;
         private int redisPort;
         private String redisEncoding;
-        private int cleanupInterval;
+        private int checkInterval;
 
         public RedisquesConfigurationBuilder(){
             this.address = "redisques";
@@ -185,7 +185,7 @@ public class RedisquesConfiguration {
             this.redisHost = "localhost";
             this.redisPort = 6379;
             this.redisEncoding = "UTF-8";
-            this.cleanupInterval = DEFAULT_CLEANUP_INTERVAL; //60s
+            this.checkInterval = DEFAULT_CHECK_INTERVAL; //60s
         }
 
         public RedisquesConfigurationBuilder address(String address){
@@ -223,8 +223,8 @@ public class RedisquesConfiguration {
             return this;
         }
 
-        public RedisquesConfigurationBuilder cleanupInterval(int cleanupInterval){
-            this.cleanupInterval = cleanupInterval;
+        public RedisquesConfigurationBuilder checkInterval(int checkInterval){
+            this.checkInterval = checkInterval;
             return this;
         }
 

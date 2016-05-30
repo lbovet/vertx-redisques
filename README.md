@@ -35,7 +35,7 @@ The following configuration values are available:
 | redisHost | localhost | The host where redis is running on |
 | redisPort | 6379 | The port where redis is running on |
 | redisEncoding | UTF-8 | The encoding to use in redis |
-| cleanupInterval | 60 | The interval [s] to cleanup timestamps of not-active / empty queues by executing **check** queue operation. _cleanupInterval_ value must be greater 0, otherwise the default is used. |
+| checkInterval | 60 | The interval [s] to check timestamps of not-active / empty queues by executing **check** queue operation. _checkInterval_ value must be greater 0, otherwise the default is used. |
 
 ### Configuration util
 

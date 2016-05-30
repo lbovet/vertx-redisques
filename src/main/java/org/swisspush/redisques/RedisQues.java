@@ -63,7 +63,7 @@ public class RedisQues extends AbstractVerticle {
 
     private String redisques_locks = "redisques:locks";
 
-    private String queue_cleanup_lastexec = redisPrefix + "cleanup:lastexec";
+    private String queue_check_lastexec = redisPrefix + "check:lastexec";
 
     // Address of message processors
     private String processorAddress = "redisques-processor";
@@ -74,7 +74,7 @@ public class RedisQues extends AbstractVerticle {
     // consuming.
     private int refreshPeriod = 10;
 
-    private int cleanupInterval;
+    private int checkInterval;
 
     // the time we wait for the processor to answer, before we cancel processing
     private int processorTimeout = 240000;
@@ -121,7 +121,7 @@ public class RedisQues extends AbstractVerticle {
         redisPrefix = modConfig.getRedisPrefix();
         processorAddress = modConfig.getProcessorAddress();
         refreshPeriod = modConfig.getRefreshPeriod();
-        cleanupInterval = modConfig.getCleanupInterval();
+        checkInterval = modConfig.getCheckInterval();
 
         this.redisClient = RedisClient.create(vertx, new RedisOptions()
                 .setHost(modConfig.getRedisHost())
@@ -283,14 +283,14 @@ public class RedisQues extends AbstractVerticle {
             });
         });
 
-        registerQueueCleanup(modConfig);
+        registerQueueCheck(modConfig);
     }
 
-    private void registerQueueCleanup(RedisquesConfiguration modConfig) {
-        vertx.setPeriodic(modConfig.getCleanupIntervalTimerMs(), periodicEvent -> {
-            luaScriptManager.handleQueueCleanup(queue_cleanup_lastexec, cleanupInterval, shouldCleanup -> {
-                if (shouldCleanup) {
-                    log.info("periodic queue cleanup is triggered now");
+    private void registerQueueCheck(RedisquesConfiguration modConfig) {
+        vertx.setPeriodic(modConfig.getCheckIntervalTimerMs(), periodicEvent -> {
+            luaScriptManager.handleQueueCheck(queue_check_lastexec, checkInterval, shouldCheck -> {
+                if (shouldCheck) {
+                    log.info("periodic queue check is triggered now");
                     checkQueues();
                 }
             });
@@ -607,7 +607,7 @@ public class RedisQues extends AbstractVerticle {
 
     /**
      * Notify not-active/not-empty queues to be processed (e.g. after a reboot).
-     * Cleanup timestamps of not-active/empty queues.
+     * Check timestamps of not-active/empty queues.
      * This uses a sorted set of queue names scored by last update timestamp.
      */
     private void checkQueues() {

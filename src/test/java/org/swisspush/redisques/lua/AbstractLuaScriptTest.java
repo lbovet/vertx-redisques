@@ -76,16 +76,16 @@ public abstract class AbstractLuaScriptTest {
         return sb.toString();
     }
 
-    protected Object evalScriptCleanup(String lastCleanupExecKey, int cleanupInterval) {
-        String cleanupScript = readScript("redisques_cleanup.lua");
-        return jedis.eval(cleanupScript, new ArrayList() {
+    protected Object evalScriptCheck(String lastCheckExecKey, int checkInterval) {
+        String checkScript = readScript("redisques_check.lua");
+        return jedis.eval(checkScript, new ArrayList() {
                     {
-                        add(lastCleanupExecKey);
+                        add(lastCheckExecKey);
                     }
                 }, new ArrayList() {
                     {
                         add(String.valueOf(System.currentTimeMillis()));
-                        add(String.valueOf(cleanupInterval));
+                        add(String.valueOf(checkInterval));
                     }
                 }
         );
