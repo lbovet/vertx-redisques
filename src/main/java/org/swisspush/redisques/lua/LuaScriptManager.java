@@ -21,7 +21,7 @@ public class LuaScriptManager {
     public LuaScriptManager(RedisClient redisClient){
         this.redisClient = redisClient;
 
-        LuaScriptState luaGetScriptState = new LuaScriptState(LuaScript.CLEANUP, redisClient, false);
+        LuaScriptState luaGetScriptState = new LuaScriptState(LuaScript.CLEANUP, redisClient);
         luaGetScriptState.loadLuaScript(new RedisCommandDoNothing(), 0);
         luaScripts.put(LuaScript.CLEANUP, luaGetScriptState);
     }
@@ -31,27 +31,11 @@ public class LuaScriptManager {
      * If the loglevel is not trace and the logoutput in luaScriptState is true, then reload the script without logoutput and execute the RedisCommand.
      * If the loglevel is matching the luaScriptState, just execute the RedisCommand.
      *
-     * @param luaScript the type of lua script
      * @param redisCommand the redis command to execute
      * @param executionCounter current count of already passed executions
      */
-    private void reloadScriptIfLoglevelChangedAndExecuteRedisCommand(LuaScript luaScript, RedisCommand redisCommand, int executionCounter) {
-        boolean logoutput = log.isTraceEnabled();
-        LuaScriptState luaScriptState = luaScripts.get(luaScript);
-        // if the loglevel didn't change, execute the command and return
-        if(logoutput == luaScriptState.getLogoutput()) {
-            redisCommand.exec(executionCounter);
-            return;
-            // if the loglevel changed, set the new loglevel into the luaScriptState, recompose the script and provide the redisCommand as parameter to execute
-        } else if(logoutput && ! luaScriptState.getLogoutput()) {
-            luaScriptState.setLogoutput(true);
-            luaScriptState.recomposeLuaScript();
-
-        } else if(! logoutput && luaScriptState.getLogoutput()) {
-            luaScriptState.setLogoutput(false);
-            luaScriptState.recomposeLuaScript();
-        }
-        luaScriptState.loadLuaScript(redisCommand, executionCounter);
+    private void executeRedisCommand(RedisCommand redisCommand, int executionCounter) {
+        redisCommand.exec(executionCounter);
     }
 
     public void handleQueueCleanup(String lastCleanupExecKey, int cleanupInterval, Handler<Boolean> handler){
@@ -60,7 +44,7 @@ public class LuaScriptManager {
                 String.valueOf(System.currentTimeMillis()),
                 String.valueOf(cleanupInterval)
         );
-        reloadScriptIfLoglevelChangedAndExecuteRedisCommand(LuaScript.CLEANUP, new Cleanup(keys, arguments, redisClient, handler), 0);
+        executeRedisCommand(new Cleanup(keys, arguments, redisClient, handler), 0);
     }
 
     private class Cleanup implements RedisCommand {

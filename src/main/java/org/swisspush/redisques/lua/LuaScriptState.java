@@ -17,8 +17,6 @@ public class LuaScriptState {
     private LuaScript luaScriptType;
     /** the script itself */
     private String script;
-    /** if the script logs to the redis log */
-    private boolean logoutput = false;
     /** the sha, over which the script can be accessed in redis */
     private String sha;
 
@@ -26,10 +24,9 @@ public class LuaScriptState {
 
     private Logger log = LoggerFactory.getLogger(LuaScriptState.class);
 
-    public LuaScriptState(LuaScript luaScriptType, RedisClient redisClient, boolean logoutput) {
+    public LuaScriptState(LuaScript luaScriptType, RedisClient redisClient) {
         this.luaScriptType = luaScriptType;
         this.redisClient = redisClient;
-        this.logoutput = logoutput;
         this.composeLuaScript(luaScriptType);
         this.loadLuaScript(new RedisCommandDoNothing(), 0);
     }
@@ -40,7 +37,7 @@ public class LuaScriptState {
      * @param luaScriptType
      */
     private void composeLuaScript(LuaScript luaScriptType) {
-        log.info("read the lua script for script type: " + luaScriptType + " with logoutput: " + logoutput);
+        log.info("read the lua script for script type: " + luaScriptType);
         this.script = readLuaScriptFromClasspath(luaScriptType);
         this.sha = DigestUtils.sha1Hex(this.script);
     }
@@ -52,9 +49,6 @@ public class LuaScriptState {
             sb = new StringBuilder();
             String line;
             while ((line = in.readLine()) != null) {
-                if (!logoutput && line.contains("redis.log(redis.LOG_NOTICE,")) {
-                    continue;
-                }
                 sb.append(line).append("\n");
             }
 
@@ -97,7 +91,7 @@ public class LuaScriptState {
                 log.debug("RedisStorage script already exists in redis cache: " + luaScriptType);
                 redisCommand.exec(executionCounterIncr);
             } else {
-                log.info("load lua script for script type: " + luaScriptType + " logutput: " + logoutput);
+                log.info("load lua script for script type: " + luaScriptType);
                 redisClient.scriptLoad(script, stringAsyncResult -> {
                     String newSha = stringAsyncResult.result();
                     log.info("got sha from redis for lua script: " + luaScriptType + ": " + newSha);
@@ -118,14 +112,6 @@ public class LuaScriptState {
 
     public void setScript(String script) {
         this.script = script;
-    }
-
-    public boolean getLogoutput() {
-        return logoutput;
-    }
-
-    public void setLogoutput(boolean logoutput) {
-        this.logoutput = logoutput;
     }
 
     public String getSha() {
