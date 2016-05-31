@@ -79,6 +79,7 @@ public abstract class AbstractTestCase {
         JsonObject config = RedisquesConfiguration.with()
                 .processorAddress("processor-address")
                 .redisEncoding("ISO-8859-1")
+                .refreshPeriod(2)
                 .build()
                 .asJsonObject();
 
@@ -100,6 +101,7 @@ public abstract class AbstractTestCase {
     }
 
 
-
-
+    protected void eventBusSend(JsonObject operation, Handler<AsyncResult<Message<JsonObject>>> handler){
+        vertx.eventBus().send("redisques", operation, handler);
+    }
 }
