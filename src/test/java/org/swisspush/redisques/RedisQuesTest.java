@@ -35,13 +35,17 @@ public class RedisQuesTest extends AbstractTestCase {
         Async async = context.async();
         flushAll();
         final JsonObject operation = buildEnqueueOperation("queue1", "hello");
-        vertx.eventBus().consumer("digest-queue1", (Handler<Message<String>>) event -> {});
+        vertx.eventBus().consumer("digest-queue1", (Handler<Message<String>>) event -> {
+            // we complete, when the queue processor is called
+            // the queue processor gets only called, once because it gets only called on the STOP message
+            // check the AbstractTestCase#initProcessor
+            async.complete();
+        });
         eventBusSend(operation, reply -> {
             context.assertEquals(OK, reply.result().body().getString(STATUS));
             operation.put("message", "STOP");
             eventBusSend(operation, reply1 -> {
                 context.assertEquals(OK, reply1.result().body().getString(STATUS));
-                async.complete();
             });
         });
     }
