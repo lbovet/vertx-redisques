@@ -1,9 +1,6 @@
 package org.swisspush.redisques;
 
-import io.vertx.core.AsyncResult;
-import io.vertx.core.DeploymentOptions;
-import io.vertx.core.Handler;
-import io.vertx.core.Vertx;
+import io.vertx.core.*;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;
@@ -78,7 +75,9 @@ public abstract class AbstractTestCase {
     }
 
     private static void setUp(TestContext context) {
-        vertx = Vertx.vertx();
+        VertxOptions options = new VertxOptions();
+        options.setMaxEventLoopExecuteTime(Long.MAX_VALUE);
+        vertx = Vertx.vertx(options);
         initProcessor(vertx.eventBus());
 
         JsonObject config = RedisquesConfiguration.with()
@@ -96,7 +95,6 @@ public abstract class AbstractTestCase {
 
     private static void initProcessor(EventBus eventBus){
 
-        final Map<String, Integer> counters = new HashMap<>();
         final Map<String, MessageDigest> signatures = new HashMap<>();
 
         eventBus.consumer("processor-address", new Handler<Message<JsonObject>>() {
