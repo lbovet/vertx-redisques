@@ -7,7 +7,16 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
+import org.junit.Ignore;
 import org.junit.Test;
+
+import javax.xml.bind.DatatypeConverter;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.swisspush.redisques.util.RedisquesAPI.*;
 
@@ -17,6 +26,10 @@ import static org.swisspush.redisques.util.RedisquesAPI.*;
  * @author baldim, webermarca
  */
 public class RedisQuesTest extends AbstractTestCase {
+
+    public static final String TIMESTAMP = "timestamp";
+    public static final String QUEUES_PREFIX = "redisques:queues:";
+    public static final String REDISQUES_LOCKS = "redisques:locks";
 
     @Test
     public void testUnsupportedOperation(TestContext context) {
@@ -34,30 +47,22 @@ public class RedisQuesTest extends AbstractTestCase {
     public void enqueueWithQueueProcessor(TestContext context) throws Exception {
         Async async = context.async();
         flushAll();
-        final JsonObject operation = buildEnqueueOperation("queue1", "hello");
-        vertx.eventBus().consumer("digest-queue1", (Handler<Message<String>>) event -> {
-            // we complete, when the queue processor is called
-            // the queue processor gets only called, once because it gets only called on the STOP message
-            // check the AbstractTestCase#initProcessor
+
+        final JsonObject operation = buildEnqueueOperation("checkqueue", "hello");
+        vertx.eventBus().consumer("processor-address", (Handler<Message<JsonObject>>) message -> {
+            final String queue = message.body().getString("queue");
+            final String payload = message.body().getString("payload");
+            log.info("process message for queue: " + queue);
+            log.info("process message for payload: " + payload);
             async.complete();
         });
         eventBusSend(operation, reply -> {
             context.assertEquals(OK, reply.result().body().getString(STATUS));
-            operation.put("message", "STOP");
+            operation.put("message", "hello");
             eventBusSend(operation, reply1 -> {
                 context.assertEquals(OK, reply1.result().body().getString(STATUS));
             });
         });
-    }
-
-    @Test
-    public void testMore(TestContext context) throws Exception {
-        Async async = context.async();
-        flushAll();
-        assertKeyCount(context, 0);
-        for (int i = 0; i < NUM_QUEUES; i++) {
-            new Sender(context, async, "queue_" + i).send(null);
-        }
     }
 
     @Test
@@ -304,6 +309,23 @@ public class RedisQuesTest extends AbstractTestCase {
                     async.complete();
                 });
             });
+        });
+    }
+
+    @Test
+    @Ignore
+    public void notActiveQueueActivatedThroughCheck(TestContext context) throws Exception {
+        Async async = context.async();
+        flushAll();
+        final JsonObject operation = buildEnqueueOperation("check-queue", "STOP");
+        vertx.eventBus().consumer("digest-queue", (Handler<Message<String>>) event -> {
+            // we complete, when the queue processor is called
+            // the queue processor gets only called, once because it gets only called on the STOP message
+            // check the AbstractTestCase#initProcessor
+            async.complete();
+        });
+        eventBusSend(operation, reply -> {
+            context.assertEquals(OK, reply.result().body().getString(STATUS));
         });
     }
 
