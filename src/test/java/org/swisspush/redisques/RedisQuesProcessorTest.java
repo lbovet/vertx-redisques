@@ -3,9 +3,12 @@ package org.swisspush.redisques;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.Message;
+import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import javax.xml.bind.DatatypeConverter;
@@ -16,9 +19,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.swisspush.redisques.util.RedisquesAPI.OK;
-import static org.swisspush.redisques.util.RedisquesAPI.STATUS;
-import static org.swisspush.redisques.util.RedisquesAPI.buildEnqueueOperation;
+import static org.swisspush.redisques.util.RedisquesAPI.*;
 
 /**
  * Created by kammermannf on 31.05.2016.
@@ -27,46 +28,52 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
 
     public static final int NUM_QUEUES = 10;
 
+    private static MessageConsumer<JsonObject> queueProcessor = null;
+
+    @BeforeClass
+    public static void createQueueProcessor() {
+        queueProcessor = vertx.eventBus().consumer("processor-address");
+    }
+
     @Test
     public void test10Queues(TestContext context) throws Exception {
 
         final Map<String, MessageDigest> signatures = new HashMap<>();
 
-        vertx.eventBus().consumer("processor-address", new Handler<Message<JsonObject>>() {
-            public void handle(final Message<JsonObject> message) {
-                final String queue = message.body().getString("queue");
-                final String payload = message.body().getString("payload");
+        queueProcessor.handler(message -> {
+            final String queue = message.body().getString("queue");
+            final String payload = message.body().getString("payload");
 
-                if ("STOP".equals(payload)) {
-                    message.reply(new JsonObject() {
-                        {
-                            put("status", "ok");
-                        }
-                    });
-                    vertx.eventBus().send("digest-" + queue, DatatypeConverter.printBase64Binary(signatures.get(queue).digest()));
-                } else {
-                    MessageDigest signature = signatures.get(queue);
-                    if (signature == null) {
-                        try {
-                            signature = MessageDigest.getInstance("MD5");
-                            signatures.put(queue, signature);
-                        } catch (NoSuchAlgorithmException e) {
-                            throw new RuntimeException();
-                        }
+            if ("STOP".equals(payload)) {
+                message.reply(new JsonObject() {
+                    {
+                        put("status", "ok");
                     }
-                    signature.update(payload.getBytes());
-                }
-
-                vertx.setTimer(new Random().nextLong() % 1 + 1, event -> {
-                    log.debug("Processed message " + payload);
-                    message.reply(new JsonObject() {
-                        {
-                            put("status", "ok");
-                        }
-                    });
                 });
+                vertx.eventBus().send("digest-" + queue, DatatypeConverter.printBase64Binary(signatures.get(queue).digest()));
+            } else {
+                MessageDigest signature = signatures.get(queue);
+                if (signature == null) {
+                    try {
+                        signature = MessageDigest.getInstance("MD5");
+                        signatures.put(queue, signature);
+                    } catch (NoSuchAlgorithmException e) {
+                        throw new RuntimeException();
+                    }
+                }
+                signature.update(payload.getBytes());
             }
+
+            vertx.setTimer(new Random().nextLong() % 1 + 1, event -> {
+                log.debug("Processed message " + payload);
+                message.reply(new JsonObject() {
+                    {
+                        put("status", "ok");
+                    }
+                });
+            });
         });
+
         Async async = context.async();
         flushAll();
         assertKeyCount(context, 0);
@@ -140,5 +147,85 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
                 });
             }
         }
+    }
+
+    @Test
+    public void enqueueWithQueueProcessor(TestContext context) throws Exception {
+        Async async = context.async();
+        flushAll();
+        queueProcessor.handler(message -> {
+            // assert the values we sent too
+            context.assertEquals("check-queue", message.body().getString("queue"));
+            context.assertEquals("hello", message.body().getString("payload"));
+
+            // assert the value is still in the redis store
+            String queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+            context.assertEquals("hello", queueValueInRedis);
+            // assert that there is a consumer assigned
+            String consumer = jedis.get("redisques:consumers:check-queue");
+            context.assertNotNull(consumer);
+
+            // reply to redisques with OK, which will delete the queue entry and release the consumer
+            message.reply(new JsonObject().put(STATUS, OK));
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                throw new IllegalStateException("can not handle interrups on sleeps");
+            }
+
+            // assert that the queue is empty now
+            queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+            context.assertNull(queueValueInRedis);
+
+            // end the test
+            async.complete();
+        });
+
+
+
+        final JsonObject operation = buildEnqueueOperation("check-queue", "hello");
+        eventBusSend(operation, reply -> {
+            context.assertEquals(OK, reply.result().body().getString(STATUS));
+        });
+    }
+
+    @Test
+    @Ignore
+    public void notActiveQueueActivatedThroughCheck(TestContext context) throws Exception {
+        Async async = context.async();
+        flushAll();
+
+        vertx.eventBus().consumer("processor-address", (Handler<Message<JsonObject>>) message -> {
+            // assert the values we sent too
+            context.assertEquals("check-queue",message.body().getString("queue"));
+            context.assertEquals("hello",message.body().getString("payload"));
+
+            // assert the value is still in the redis store
+            String queueValueInRedis = jedis.lindex("redisques:queues:check-queue",0);
+            context.assertEquals("hello", queueValueInRedis);
+            // assert that there is a consumer assigned
+            String consumer = jedis.get("redisques:consumers:check-queue");
+            context.assertNotNull(consumer);
+
+            // reply to redisques with OK, which will delete the queue entry and release the consumer
+            message.reply(new JsonObject().put(STATUS, ERROR));
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                throw new IllegalStateException("can not handle interrups on sleeps");
+            }
+
+            // assert that the queue is empty now
+            queueValueInRedis = jedis.lindex("redisques:queues:check-queue",0);
+            context.assertEquals("hello", queueValueInRedis);
+
+            // end the test
+            async.complete();
+        });
+
+        final JsonObject operation = buildEnqueueOperation("check-queue", "hello");
+        eventBusSend(operation, reply -> {
+            context.assertEquals(OK, reply.result().body().getString(STATUS));
+        });
     }
 }
