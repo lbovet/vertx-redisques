@@ -75,9 +75,7 @@ public abstract class AbstractTestCase {
     }
 
     private static void setUp(TestContext context) {
-        VertxOptions options = new VertxOptions();
-        options.setMaxEventLoopExecuteTime(Long.MAX_VALUE);
-        vertx = Vertx.vertx(options);
+        vertx = Vertx.vertx();
         initProcessor(vertx.eventBus());
 
         JsonObject config = RedisquesConfiguration.with()
