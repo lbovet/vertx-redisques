@@ -104,12 +104,6 @@ public abstract class AbstractTestCase {
                 final String queue = message.body().getString("queue");
                 final String payload = message.body().getString("payload");
 
-                if(!counters.containsKey(queue)) {
-                    counters.put(queue, 0);
-                }
-
-                counters.put(queue, counters.get(queue)+1);
-
                 if ("STOP".equals(payload)) {
                     message.reply(new JsonObject() {
                         {
