@@ -44,28 +44,6 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
-    public void enqueueWithQueueProcessor(TestContext context) throws Exception {
-        Async async = context.async();
-        flushAll();
-
-        final JsonObject operation = buildEnqueueOperation("checkqueue", "hello");
-        vertx.eventBus().consumer("processor-address", (Handler<Message<JsonObject>>) message -> {
-            final String queue = message.body().getString("queue");
-            final String payload = message.body().getString("payload");
-            log.info("process message for queue: " + queue);
-            log.info("process message for payload: " + payload);
-            async.complete();
-        });
-        eventBusSend(operation, reply -> {
-            context.assertEquals(OK, reply.result().body().getString(STATUS));
-            operation.put("message", "hello");
-            eventBusSend(operation, reply1 -> {
-                context.assertEquals(OK, reply1.result().body().getString(STATUS));
-            });
-        });
-    }
-
-    @Test
     public void enqueue(TestContext context) {
         Async async = context.async();
         flushAll();
@@ -313,23 +291,6 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
-    @Ignore
-    public void notActiveQueueActivatedThroughCheck(TestContext context) throws Exception {
-        Async async = context.async();
-        flushAll();
-        final JsonObject operation = buildEnqueueOperation("check-queue", "STOP");
-        vertx.eventBus().consumer("digest-queue", (Handler<Message<String>>) event -> {
-            // we complete, when the queue processor is called
-            // the queue processor gets only called, once because it gets only called on the STOP message
-            // check the AbstractTestCase#initProcessor
-            async.complete();
-        });
-        eventBusSend(operation, reply -> {
-            context.assertEquals(OK, reply.result().body().getString(STATUS));
-        });
-    }
-
-    @Test
     public void getAllLocks(TestContext context) {
         Async async = context.async();
         flushAll();
@@ -488,7 +449,4 @@ public class RedisQuesTest extends AbstractTestCase {
         }
     }
 
-    private void eventBusSend(JsonObject operation, Handler<AsyncResult<Message<JsonObject>>> handler){
-        vertx.eventBus().send("redisques", operation, handler);
-    }
 }
