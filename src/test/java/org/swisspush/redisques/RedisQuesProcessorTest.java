@@ -7,8 +7,9 @@ import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
+import io.vertx.ext.unit.junit.Timeout;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 
 import javax.xml.bind.DatatypeConverter;
@@ -29,6 +30,9 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
     public static final int NUM_QUEUES = 10;
 
     private static MessageConsumer<JsonObject> queueProcessor = null;
+
+    @Rule
+    public Timeout rule = Timeout.seconds(5);
 
     @BeforeClass
     public static void createQueueProcessor() {
@@ -167,11 +171,7 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
 
             // reply to redisques with OK, which will delete the queue entry and release the consumer
             message.reply(new JsonObject().put(STATUS, OK));
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                throw new IllegalStateException("can not handle interrups on sleeps");
-            }
+            sleep(500);
 
             // assert that the queue is empty now
             queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
@@ -190,42 +190,62 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
     }
 
     @Test
-    @Ignore
-    public void notActiveQueueActivatedThroughCheck(TestContext context) throws Exception {
+    public void enqueueWithQueueProcessorFirstProcessFails(TestContext context) throws Exception {
         Async async = context.async();
         flushAll();
 
-        vertx.eventBus().consumer("processor-address", (Handler<Message<JsonObject>>) message -> {
+        final AtomicInteger queueProcessorCounter = new AtomicInteger(0);
+
+        queueProcessor.handler(message -> {
+
+            int queueProcessCount = queueProcessorCounter.incrementAndGet();
+
             // assert the values we sent too
-            context.assertEquals("check-queue",message.body().getString("queue"));
-            context.assertEquals("hello",message.body().getString("payload"));
+            context.assertEquals("check-queue", message.body().getString("queue"));
+            context.assertEquals("hello", message.body().getString("payload"));
 
             // assert the value is still in the redis store
-            String queueValueInRedis = jedis.lindex("redisques:queues:check-queue",0);
+            String queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
             context.assertEquals("hello", queueValueInRedis);
             // assert that there is a consumer assigned
             String consumer = jedis.get("redisques:consumers:check-queue");
             context.assertNotNull(consumer);
 
-            // reply to redisques with OK, which will delete the queue entry and release the consumer
-            message.reply(new JsonObject().put(STATUS, ERROR));
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                throw new IllegalStateException("can not handle interrups on sleeps");
+
+            if (queueProcessCount == 0) {
+
+                // reply to redisques with OK, which will delete the queue entry and release the consumer
+                message.reply(new JsonObject().put(STATUS, ERROR));
+
+                sleep(500);
+
+                // assert that value is still in the queue
+                queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+                context.assertEquals("hello", queueValueInRedis);
+            } else {
+                message.reply(new JsonObject().put(STATUS, OK));
+                sleep(500);
+
+                // assert that the queue is empty now
+                queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+                context.assertNull(queueValueInRedis);
+
+                // end the test
+                async.complete();
             }
-
-            // assert that the queue is empty now
-            queueValueInRedis = jedis.lindex("redisques:queues:check-queue",0);
-            context.assertEquals("hello", queueValueInRedis);
-
-            // end the test
-            async.complete();
         });
 
         final JsonObject operation = buildEnqueueOperation("check-queue", "hello");
         eventBusSend(operation, reply -> {
             context.assertEquals(OK, reply.result().body().getString(STATUS));
         });
+    }
+
+    private void sleep(int millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            throw new IllegalStateException("can not handle interrups on sleeps");
+        }
     }
 }
