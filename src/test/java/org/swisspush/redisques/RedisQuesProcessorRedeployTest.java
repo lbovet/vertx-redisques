@@ -38,17 +38,16 @@ public class RedisQuesProcessorRedeployTest extends AbstractTestCase {
             context.assertEquals("check-queue", message.body().getString("queue"));
             context.assertEquals("hello", message.body().getString("payload"));
 
-            // assert the value is still in the redis store
-            String queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
-            context.assertEquals("hello", queueValueInRedis);
+            message.reply(new JsonObject().put(STATUS, ERROR));
 
             // assert that there is a consumer assigned
             String consumer = jedis.get("redisques:consumers:check-queue");
             context.assertNotNull(consumer);
 
             // assert that value is still in the queue
-            queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+            String queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
             context.assertEquals("hello", queueValueInRedis);
+
 
             // undeploy redisques to simulate a server restart
             vertx.undeploy(deploymentId, res -> {
