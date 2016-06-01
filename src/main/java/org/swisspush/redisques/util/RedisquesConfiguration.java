@@ -44,7 +44,7 @@ public class RedisquesConfiguration {
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
                                   String redisHost, int redisPort, String redisEncoding, int processorTimeout) {
-        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, processorTimeout, DEFAULT_CHECK_INTERVAL);
+        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, DEFAULT_CHECK_INTERVAL, processorTimeout);
     }
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
@@ -73,7 +73,7 @@ public class RedisquesConfiguration {
 
     private RedisquesConfiguration(RedisquesConfigurationBuilder builder){
         this(builder.address, builder.redisPrefix, builder.processorAddress, builder.refreshPeriod,
-                builder.redisHost, builder.redisPort, builder.redisEncoding, builder.checkInterval);
+                builder.redisHost, builder.redisPort, builder.redisEncoding, builder.checkInterval, builder.processorTimeout);
     }
 
     public JsonObject asJsonObject(){
@@ -117,7 +117,7 @@ public class RedisquesConfiguration {
             builder.checkInterval(json.getInteger(PROP_CHECK_INTERVAL));
         }
         if(json.containsKey(PROP_PROCESSOR_TIMEOUT)){
-            builder.checkInterval(json.getInteger(PROP_PROCESSOR_TIMEOUT));
+            builder.processorTimeout(json.getInteger(PROP_PROCESSOR_TIMEOUT));
         }
         return builder.build();
     }

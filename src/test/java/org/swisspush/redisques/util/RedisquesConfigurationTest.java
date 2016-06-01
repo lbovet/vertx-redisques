@@ -15,6 +15,7 @@ import static org.swisspush.redisques.util.RedisquesConfiguration.*;
  */
 @RunWith(VertxUnitRunner.class)
 public class RedisquesConfigurationTest {
+
     @Test
     public void testDefaultConfiguration(TestContext testContext){
         RedisquesConfiguration config = new RedisquesConfiguration();
@@ -26,6 +27,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRedisPort(), 6379);
         testContext.assertEquals(config.getRedisEncoding(), "UTF-8");
         testContext.assertEquals(config.getCheckInterval(), 60);
+        testContext.assertEquals(config.getProcessorTimeout(), 240000);
     }
 
     @Test
@@ -35,6 +37,7 @@ public class RedisquesConfigurationTest {
                 .redisHost("anotherhost")
                 .redisPort(1234)
                 .checkInterval(5)
+                .processorTimeout(10)
                 .build();
 
         // default values
@@ -48,6 +51,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRedisHost(), "anotherhost");
         testContext.assertEquals(config.getRedisPort(), 1234);
         testContext.assertEquals(config.getCheckInterval(), 5);
+        testContext.assertEquals(config.getProcessorTimeout(), 10);
     }
 
     @Test
@@ -63,6 +67,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(json.getInteger(PROP_REDIS_PORT), 6379);
         testContext.assertEquals(json.getString(PROP_REDIS_ENCODING), "UTF-8");
         testContext.assertEquals(json.getInteger(PROP_CHECK_INTERVAL), 60);
+        testContext.assertEquals(json.getInteger(PROP_PROCESSOR_TIMEOUT), 240000);
     }
 
     @Test
@@ -73,6 +78,7 @@ public class RedisquesConfigurationTest {
                 .redisHost("anotherhost")
                 .redisPort(1234)
                 .checkInterval(5)
+                .processorTimeout(20)
                 .build();
 
         JsonObject json = config.asJsonObject();
@@ -88,6 +94,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(json.getString(PROP_REDIS_HOST), "anotherhost");
         testContext.assertEquals(json.getInteger(PROP_REDIS_PORT), 1234);
         testContext.assertEquals(json.getInteger(PROP_CHECK_INTERVAL), 5);
+        testContext.assertEquals(json.getInteger(PROP_PROCESSOR_TIMEOUT), 20);
     }
 
     @Test
@@ -103,6 +110,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRedisPort(), 6379);
         testContext.assertEquals(config.getRedisEncoding(), "UTF-8");
         testContext.assertEquals(config.getCheckInterval(), 60);
+        testContext.assertEquals(config.getProcessorTimeout(), 240000);
     }
 
     @Test
@@ -117,6 +125,7 @@ public class RedisquesConfigurationTest {
         json.put(PROP_REDIS_PORT, 4321);
         json.put(PROP_REDIS_ENCODING, "new_encoding");
         json.put(PROP_CHECK_INTERVAL, 5);
+        json.put(PROP_PROCESSOR_TIMEOUT, 30);
 
         RedisquesConfiguration config = fromJsonObject(json);
         testContext.assertEquals(config.getAddress(), "new_address");
@@ -127,6 +136,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRedisPort(), 4321);
         testContext.assertEquals(config.getRedisEncoding(), "new_encoding");
         testContext.assertEquals(config.getCheckInterval(), 5);
+        testContext.assertEquals(config.getProcessorTimeout(), 30);
     }
 
     @Test
