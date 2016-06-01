@@ -18,6 +18,7 @@ public class RedisquesConfiguration {
     private int redisPort;
     private String redisEncoding;
     private int checkInterval;
+    private int processorTimeout;
 
     private static final int DEFAULT_CHECK_INTERVAL = 60; // 60s
 
@@ -29,6 +30,7 @@ public class RedisquesConfiguration {
     public static final String PROP_REDIS_PORT = "redisPort";
     public static final String PROP_REDIS_ENCODING = "redisEncoding";
     public static final String PROP_CHECK_INTERVAL = "checkInterval";
+    public static final String PROP_PROCESSOR_TIMEOUT = "processorTimeout";
 
     private Logger log = LoggerFactory.getLogger(RedisquesConfiguration.class);
 
@@ -41,12 +43,12 @@ public class RedisquesConfiguration {
     }
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
-                                  String redisHost, int redisPort, String redisEncoding) {
-        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, DEFAULT_CHECK_INTERVAL);
+                                  String redisHost, int redisPort, String redisEncoding, int processorTimeout) {
+        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, processorTimeout, DEFAULT_CHECK_INTERVAL);
     }
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
-                                  String redisHost, int redisPort, String redisEncoding, int checkInterval) {
+                                  String redisHost, int redisPort, String redisEncoding, int checkInterval, int processorTimeout) {
         this.address = address;
         this.redisPrefix = redisPrefix;
         this.processorAddress = processorAddress;
@@ -61,6 +63,8 @@ public class RedisquesConfiguration {
             log.warn("Overriden checkInterval of " + checkInterval + "s is not valid. Using default value of " + DEFAULT_CHECK_INTERVAL + "s instead.");
             this.checkInterval = DEFAULT_CHECK_INTERVAL;
         }
+
+        this.processorTimeout = processorTimeout;
     }
 
     public static RedisquesConfigurationBuilder with(){
@@ -82,6 +86,7 @@ public class RedisquesConfiguration {
         obj.put(PROP_REDIS_PORT, getRedisPort());
         obj.put(PROP_REDIS_ENCODING, getRedisEncoding());
         obj.put(PROP_CHECK_INTERVAL, getCheckInterval());
+        obj.put(PROP_PROCESSOR_TIMEOUT, getProcessorTimeout());
         return obj;
     }
 
@@ -111,6 +116,9 @@ public class RedisquesConfiguration {
         if(json.containsKey(PROP_CHECK_INTERVAL)){
             builder.checkInterval(json.getInteger(PROP_CHECK_INTERVAL));
         }
+        if(json.containsKey(PROP_PROCESSOR_TIMEOUT)){
+            builder.checkInterval(json.getInteger(PROP_PROCESSOR_TIMEOUT));
+        }
         return builder.build();
     }
 
@@ -137,6 +145,8 @@ public class RedisquesConfiguration {
     public int getRedisPort() { return redisPort; }
 
     public int getCheckInterval() { return checkInterval; }
+
+    public int getProcessorTimeout() { return processorTimeout; }
 
     /**
      * Gets the value for the vertx periodic timer.
@@ -176,6 +186,7 @@ public class RedisquesConfiguration {
         private int redisPort;
         private String redisEncoding;
         private int checkInterval;
+        private int processorTimeout;
 
         public RedisquesConfigurationBuilder(){
             this.address = "redisques";
@@ -186,6 +197,7 @@ public class RedisquesConfiguration {
             this.redisPort = 6379;
             this.redisEncoding = "UTF-8";
             this.checkInterval = DEFAULT_CHECK_INTERVAL; //60s
+            this.processorTimeout = 240000;
         }
 
         public RedisquesConfigurationBuilder address(String address){
@@ -225,6 +237,11 @@ public class RedisquesConfiguration {
 
         public RedisquesConfigurationBuilder checkInterval(int checkInterval){
             this.checkInterval = checkInterval;
+            return this;
+        }
+
+        public RedisquesConfigurationBuilder processorTimeout(int processorTimeout){
+            this.processorTimeout = processorTimeout;
             return this;
         }
 

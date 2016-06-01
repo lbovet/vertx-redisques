@@ -122,6 +122,7 @@ public class RedisQues extends AbstractVerticle {
         processorAddress = modConfig.getProcessorAddress();
         refreshPeriod = modConfig.getRefreshPeriod();
         checkInterval = modConfig.getCheckInterval();
+        processorTimeout = modConfig.getProcessorTimeout();
 
         this.redisClient = RedisClient.create(vertx, new RedisOptions()
                 .setHost(modConfig.getRedisHost())
