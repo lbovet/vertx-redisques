@@ -504,6 +504,9 @@ public class RedisQues extends AbstractVerticle {
     }
 
     private void rescheduleSendMessageAfterFailure(final String queue) {
+        if(log.isTraceEnabled()) {
+            log.trace("RedsQues reschedule after failure for queue: " + queue);
+        }
         vertx.setTimer(refreshPeriod * 1000, timerId -> notifyConsumer(queue));
     }
 
