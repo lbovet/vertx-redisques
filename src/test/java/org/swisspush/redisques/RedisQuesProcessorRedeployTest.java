@@ -1,12 +1,17 @@
 package org.swisspush.redisques;
 
+import io.vertx.core.DeploymentOptions;
+import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.Timeout;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.swisspush.redisques.util.RedisquesConfiguration;
+import redis.clients.jedis.Jedis;
 
 import static org.swisspush.redisques.util.RedisquesAPI.*;
 
@@ -17,6 +22,29 @@ public class RedisQuesProcessorRedeployTest extends AbstractTestCase {
 
     @Rule
     public Timeout rule = Timeout.seconds(20);
+
+    @BeforeClass
+    public static void deployRedisques(TestContext context) {
+        deployRedisques(context, 2);
+    }
+
+    protected static void deployRedisques(TestContext context, int refreshPeriod) {
+        vertx = Vertx.vertx();
+        JsonObject config = RedisquesConfiguration.with()
+                .processorAddress("processor-address")
+                .redisEncoding("ISO-8859-1")
+                .refreshPeriod(refreshPeriod)
+                .build()
+                .asJsonObject();
+
+        RedisQues redisQues = new RedisQues();
+        vertx.deployVerticle(redisQues, new DeploymentOptions().setConfig(config), context.asyncAssertSuccess(event -> {
+            deploymentId = event;
+            log.info("vert.x Deploy - " + redisQues.getClass().getSimpleName() + " was successful.");
+            jedis = new Jedis("localhost", 6379, 5000);
+        }));
+    }
+
 
     /**
      *  This test checks if existing queues are processed after a restart of the redisque verticle.
@@ -58,7 +86,7 @@ public class RedisQuesProcessorRedeployTest extends AbstractTestCase {
 
                 // we have to wait long enough, that the redisques consumer key expires
                 sleep(3000);
-                AbstractTestCase.deployRedisques(context, 1);
+                deployRedisques(context, 1);
                 sleep(3000);
 
                 // reregister the processor
