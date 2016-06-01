@@ -43,7 +43,6 @@ public abstract class AbstractTestCase {
         if(!RedisEmbeddedConfiguration.useExternalRedis()) {
             RedisEmbeddedConfiguration.redisServer.start();
         }
-        deployRedisques(context, 2);
     }
 
     @AfterClass
@@ -54,29 +53,10 @@ public abstract class AbstractTestCase {
         jedis.close();
     }
 
-    protected static void deployRedisques(TestContext context, int refreshPeriod) {
-        vertx = Vertx.vertx();
-
-        JsonObject config = RedisquesConfiguration.with()
-                .processorAddress("processor-address")
-                .redisEncoding("ISO-8859-1")
-                .refreshPeriod(refreshPeriod)
-                .build()
-                .asJsonObject();
-
-        RedisQues redisQues = new RedisQues();
-        vertx.deployVerticle(redisQues, new DeploymentOptions().setConfig(config), context.asyncAssertSuccess(event -> {
-            deploymentId = event;
-            log.info("vert.x Deploy - " + redisQues.getClass().getSimpleName() + " was successful.");
-            jedis = new Jedis("localhost", 6379, 5000);
-        }));
-    }
-
     @Before
     public void cleanDB() {
         flushAll();
     }
-
 
     protected void eventBusSend(JsonObject operation, Handler<AsyncResult<Message<JsonObject>>> handler){
         vertx.eventBus().send("redisques", operation, handler);
