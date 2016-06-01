@@ -7,7 +7,9 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
+import io.vertx.ext.unit.junit.Timeout;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 
 import javax.xml.bind.DatatypeConverter;
@@ -30,6 +32,9 @@ public class RedisQuesTest extends AbstractTestCase {
     public static final String TIMESTAMP = "timestamp";
     public static final String QUEUES_PREFIX = "redisques:queues:";
     public static final String REDISQUES_LOCKS = "redisques:locks";
+
+    @Rule
+    public Timeout rule = Timeout.seconds(5);
 
     @Test
     public void testUnsupportedOperation(TestContext context) {
