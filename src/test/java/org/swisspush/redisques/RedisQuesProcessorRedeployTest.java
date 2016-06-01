@@ -16,7 +16,7 @@ import static org.swisspush.redisques.util.RedisquesAPI.*;
 public class RedisQuesProcessorRedeployTest extends AbstractTestCase {
 
     @Rule
-    public Timeout rule = Timeout.seconds(10);
+    public Timeout rule = Timeout.seconds(20);
 
     /**
      *  This test checks if existing queues are processed after a restart of the redisque verticle.
@@ -32,12 +32,14 @@ public class RedisQuesProcessorRedeployTest extends AbstractTestCase {
 
         final MessageConsumer<JsonObject> queueProcessor = vertx.eventBus().consumer("processor-address");
 
+        // we don't reply here, this leads redisques in the consuming state
         queueProcessor.handler(message -> {
 
             // assert the values we sent too
             context.assertEquals("check-queue", message.body().getString("queue"));
             context.assertEquals("hello", message.body().getString("payload"));
 
+            // tell redisques, that the processing was not successfull
             message.reply(new JsonObject().put(STATUS, ERROR));
 
             // assert that there is a consumer assigned
@@ -48,7 +50,6 @@ public class RedisQuesProcessorRedeployTest extends AbstractTestCase {
             String queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
             context.assertEquals("hello", queueValueInRedis);
 
-
             // undeploy redisques to simulate a server restart
             vertx.undeploy(deploymentId, res -> {
                 if (! res.succeeded()) {
@@ -56,7 +57,7 @@ public class RedisQuesProcessorRedeployTest extends AbstractTestCase {
                 }
 
                 // we have to wait long enough, that the redisques consumer key expires
-                sleep(2000);
+                sleep(3000);
                 AbstractTestCase.deployRedisques(context, 1);
                 sleep(3000);
 
