@@ -3,6 +3,8 @@ apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'signing'
 
+archivesBaseName='redisques'
+
 if (!project.hasProperty('repoUsername')) {
     ext.repoUsername = 'randomUsername'
 } else {
