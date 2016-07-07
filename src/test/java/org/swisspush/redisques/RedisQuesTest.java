@@ -28,7 +28,7 @@ public class RedisQuesTest extends AbstractTestCase {
     public static final String PROCESSOR_ADDRESS = "processor-address";
 
     @Rule
-    public Timeout rule = Timeout.seconds(10);
+    public Timeout rule = Timeout.seconds(5);
 
     @BeforeClass
     public static void deployRedisques(TestContext context) {
