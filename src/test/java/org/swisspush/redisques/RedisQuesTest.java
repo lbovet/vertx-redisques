@@ -1,30 +1,21 @@
 package org.swisspush.redisques;
 
-import io.vertx.core.AsyncResult;
+import com.jayway.awaitility.Awaitility;
+import com.jayway.awaitility.Duration;
 import io.vertx.core.DeploymentOptions;
-import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
-import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.Timeout;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.swisspush.redisques.util.RedisquesConfiguration;
 import redis.clients.jedis.Jedis;
 
-import javax.xml.bind.DatatypeConverter;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicInteger;
-
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.swisspush.redisques.util.RedisquesAPI.*;
 
 /**
@@ -37,16 +28,17 @@ public class RedisQuesTest extends AbstractTestCase {
     public static final String TIMESTAMP = "timestamp";
     public static final String QUEUES_PREFIX = "redisques:queues:";
     public static final String REDISQUES_LOCKS = "redisques:locks";
+    public static final String PROCESSOR_ADDRESS = "processor-address";
 
     @Rule
-    public Timeout rule = Timeout.seconds(5);
+    public Timeout rule = Timeout.seconds(10);
 
     @BeforeClass
     public static void deployRedisques(TestContext context) {
         vertx = Vertx.vertx();
 
         JsonObject config = RedisquesConfiguration.with()
-                .processorAddress("processor-address")
+                .processorAddress(PROCESSOR_ADDRESS)
                 .redisEncoding("ISO-8859-1")
                 .refreshPeriod(2)
                 .build()
@@ -402,6 +394,50 @@ public class RedisQuesTest extends AbstractTestCase {
             context.assertFalse(jedis.hexists(REDISQUES_LOCKS, "notExistingLock"));
             async.complete();
         });
+    }
+
+    @Test
+    public void queueProcessorShouldNotBeNotNotifiedWithLockedQueue(TestContext context) throws Exception {
+        Async async = context.async();
+        flushAll();
+
+        String queue = "queue1";
+        final boolean[] processorCalled = {false};
+
+        lockQueue(queue);
+
+        setProcessorAddressConsumer(vertx.eventBus().consumer(PROCESSOR_ADDRESS, call -> processorCalled[0] = true));
+
+        eventBusSend(buildEnqueueOperation(queue, "hello"), reply -> {
+            context.assertEquals(OK, reply.result().body().getString(STATUS));
+        });
+
+        // after at most 5 seconds, the processor-address consumer should not have been called
+        Awaitility.await().atMost(Duration.FIVE_SECONDS).until(() -> processorCalled[0], equalTo(false));
+
+        unregisterProcessorAddressConsumer();
+        async.complete();
+    }
+
+    @Test
+    public void queueProcessorShouldBeNotifiedWithNonLockedQueue(TestContext context) throws Exception {
+        Async async = context.async();
+        flushAll();
+
+        String queue = "queue1";
+        final boolean[] processorCalled = {false};
+
+        setProcessorAddressConsumer(vertx.eventBus().consumer(PROCESSOR_ADDRESS, call -> processorCalled[0] = true));
+
+        eventBusSend(buildEnqueueOperation(queue, "hello"), reply -> {
+            context.assertEquals(OK, reply.result().body().getString(STATUS));
+        });
+
+        // after at most 5 seconds, the processor-address consumer should have been called
+        Awaitility.await().atMost(Duration.FIVE_SECONDS).until(() -> processorCalled[0], equalTo(true));
+
+        unregisterProcessorAddressConsumer();
+        async.complete();
     }
 
     @Test

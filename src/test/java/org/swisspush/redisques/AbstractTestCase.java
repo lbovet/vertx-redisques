@@ -1,7 +1,11 @@
 package org.swisspush.redisques;
 
-import io.vertx.core.*;
+import com.google.common.collect.ImmutableMap;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
+import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.Message;
+import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -11,8 +15,11 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
-import org.swisspush.redisques.util.RedisquesConfiguration;
 import redis.clients.jedis.Jedis;
+
+import java.util.Map;
+
+import static org.swisspush.redisques.util.RedisquesAPI.REQUESTED_BY;
 
 @RunWith(VertxUnitRunner.class)
 public abstract class AbstractTestCase {
@@ -23,6 +30,18 @@ public abstract class AbstractTestCase {
     protected static Jedis jedis;
 
     protected static String deploymentId = "";
+
+    private MessageConsumer<JsonObject> processorAddressConsumer;
+
+    protected void setProcessorAddressConsumer(MessageConsumer<JsonObject> processorAddressConsumer) {
+        this.processorAddressConsumer = processorAddressConsumer;
+    }
+
+    protected void unregisterProcessorAddressConsumer(){
+        if(processorAddressConsumer != null) {
+            processorAddressConsumer.unregister();
+        }
+    }
 
     protected void flushAll(){
         if(jedis != null){
@@ -60,5 +79,13 @@ public abstract class AbstractTestCase {
 
     protected void eventBusSend(JsonObject operation, Handler<AsyncResult<Message<JsonObject>>> handler){
         vertx.eventBus().send("redisques", operation, handler);
+    }
+
+    protected void lockQueue(String queue){
+        JsonObject lockInfo = new JsonObject();
+        lockInfo.put(REQUESTED_BY, "unit_test");
+        lockInfo.put("timestamp", System.currentTimeMillis());
+        Map<String,String> values = ImmutableMap.of(queue, lockInfo.encode());
+        jedis.hmset("redisques:locks", values);
     }
 }
