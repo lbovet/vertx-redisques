@@ -5,7 +5,6 @@ import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.Message;
-import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -30,18 +29,6 @@ public abstract class AbstractTestCase {
     protected static Jedis jedis;
 
     protected static String deploymentId = "";
-
-    private MessageConsumer<JsonObject> processorAddressConsumer;
-
-    protected void setProcessorAddressConsumer(MessageConsumer<JsonObject> processorAddressConsumer) {
-        this.processorAddressConsumer = processorAddressConsumer;
-    }
-
-    protected void unregisterProcessorAddressConsumer(){
-        if(processorAddressConsumer != null) {
-            processorAddressConsumer.unregister();
-        }
-    }
 
     protected void flushAll(){
         if(jedis != null){
