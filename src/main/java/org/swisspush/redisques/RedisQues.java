@@ -2,6 +2,7 @@ package org.swisspush.redisques;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
+import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
@@ -87,7 +88,6 @@ public class RedisQues extends AbstractVerticle {
     // Handler receiving registration requests when no consumer is registered
     // for a queue.
     private Handler<Message<String>> registrationRequestHandler = event -> {
-        final EventBus eb = vertx.eventBus();
         final String queue = event.body();
         log.debug("RedisQues Got registration request for queue " + queue + " from consumer: " + uid);
         // Try to register for this queue
@@ -442,6 +442,19 @@ public class RedisQues extends AbstractVerticle {
         });
     }
 
+    private Future<Boolean> isQueueLocked(final String queue) {
+        Future<Boolean> future = Future.future();
+        redisClient.hexists(redisques_locks, queue, event -> {
+            if(event.failed()){
+                log.warn("failed to check if queue '" + queue + "' is locked. Message: " + event.cause().getMessage());
+                future.complete(Boolean.FALSE);
+            } else{
+                future.complete(event.result() == 1);
+            }
+        });
+        return future;
+    }
+
     private void readQueue(final String queue) {
         if (log.isTraceEnabled()) {
             log.trace("RedisQues read queue: " + queue);
@@ -451,54 +464,62 @@ public class RedisQues extends AbstractVerticle {
             log.trace("RedisQues read queue lindex: " + key);
         }
 
-        redisClient.lindex(key, 0, answer -> {
-            if (log.isTraceEnabled()) {
-                log.trace("RedisQues read queue lindex result: " + answer.result());
-            }
-            if (answer.result() != null) {
-                processMessageWithTimeout(queue, answer.result(), sendResult -> {
-                    if (sendResult.success) {
-                        // Remove the processed message from the
-                        // queue
-                        String key1 = queuesPrefix + queue;
-                        if (log.isTraceEnabled()) {
-                            log.trace("RedisQues read queue lpop: " + key1);
-                        }
-                        redisClient.lpop(key1, jsonAnswer -> {
-                            log.debug("RedisQues Message removed, queue " + queue + " is ready again");
-                            myQueues.put(queue, QueueState.READY);
-                            vertx.cancelTimer(sendResult.timeoutId);
-                            // Notify that we are stopped in
-                            // case it
-                            // was the last active consumer
-                            if (stoppedHandler != null) {
-                                unregisterConsumers(false);
-                                if (myQueues.isEmpty()) {
-                                    stoppedHandler.handle(null);
+        isQueueLocked(queue).setHandler(lockAnswer -> {
+            boolean locked = lockAnswer.result();
+            if(!locked){
+                redisClient.lindex(key, 0, answer -> {
+                    if (log.isTraceEnabled()) {
+                        log.trace("RedisQues read queue lindex result: " + answer.result());
+                    }
+                    if (answer.result() != null) {
+                        processMessageWithTimeout(queue, answer.result(), sendResult -> {
+                            if (sendResult.success) {
+                                // Remove the processed message from the
+                                // queue
+                                String key1 = queuesPrefix + queue;
+                                if (log.isTraceEnabled()) {
+                                    log.trace("RedisQues read queue lpop: " + key1);
                                 }
+                                redisClient.lpop(key1, jsonAnswer -> {
+                                    log.debug("RedisQues Message removed, queue " + queue + " is ready again");
+                                    myQueues.put(queue, QueueState.READY);
+                                    vertx.cancelTimer(sendResult.timeoutId);
+                                    // Notify that we are stopped in
+                                    // case it
+                                    // was the last active consumer
+                                    if (stoppedHandler != null) {
+                                        unregisterConsumers(false);
+                                        if (myQueues.isEmpty()) {
+                                            stoppedHandler.handle(null);
+                                        }
+                                    }
+                                    // Issue notification to consume next message if any
+                                    String key2 = queuesPrefix + queue;
+                                    if (log.isTraceEnabled()) {
+                                        log.trace("RedisQues read queue: " + key);
+                                    }
+                                    redisClient.llen(key2, answer1 -> {
+                                        if (answer1.result() > 0) {
+                                            notifyConsumer(queue);
+                                        }
+                                    });
+                                });
+                            } else {
+                                // Failed. Message will be kept in queue and retried later
+                                log.debug("RedisQues Processing failed for queue " + queue);
+                                myQueues.put(queue, QueueState.READY);
+                                vertx.cancelTimer(sendResult.timeoutId);
+                                rescheduleSendMessageAfterFailure(queue);
                             }
-                            // Issue notification to consume next message if any
-                            String key2 = queuesPrefix + queue;
-                            if (log.isTraceEnabled()) {
-                                log.trace("RedisQues read queue: " + key);
-                            }
-                            redisClient.llen(key2, answer1 -> {
-                                if (answer1.result() > 0) {
-                                    notifyConsumer(queue);
-                                }
-                            });
                         });
                     } else {
-                        // Failed. Message will be kept in queue and retried later
-                        log.debug("RedisQues Processing failed for queue " + queue);
+                        // This can happen when requests to consume happen at the same moment the queue is emptied.
+                        log.debug("Got a request to consume from empty queue " + queue);
                         myQueues.put(queue, QueueState.READY);
-                        vertx.cancelTimer(sendResult.timeoutId);
-                        rescheduleSendMessageAfterFailure(queue);
                     }
                 });
             } else {
-                // This can happen when requests to consume happen at the same moment the queue is emptied.
-                log.debug("Got a request to consume from empty queue " + queue);
+                log.debug("Got a request to consume from locked queue " + queue);
                 myQueues.put(queue, QueueState.READY);
             }
         });

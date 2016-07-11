@@ -1,29 +1,17 @@
 package org.swisspush.redisques;
 
-import io.vertx.core.AsyncResult;
 import io.vertx.core.DeploymentOptions;
-import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
-import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.Timeout;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.swisspush.redisques.util.RedisquesConfiguration;
 import redis.clients.jedis.Jedis;
-
-import javax.xml.bind.DatatypeConverter;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.swisspush.redisques.util.RedisquesAPI.*;
 
@@ -37,6 +25,7 @@ public class RedisQuesTest extends AbstractTestCase {
     public static final String TIMESTAMP = "timestamp";
     public static final String QUEUES_PREFIX = "redisques:queues:";
     public static final String REDISQUES_LOCKS = "redisques:locks";
+    public static final String PROCESSOR_ADDRESS = "processor-address";
 
     @Rule
     public Timeout rule = Timeout.seconds(5);
@@ -46,7 +35,7 @@ public class RedisQuesTest extends AbstractTestCase {
         vertx = Vertx.vertx();
 
         JsonObject config = RedisquesConfiguration.with()
-                .processorAddress("processor-address")
+                .processorAddress(PROCESSOR_ADDRESS)
                 .redisEncoding("ISO-8859-1")
                 .refreshPeriod(2)
                 .build()

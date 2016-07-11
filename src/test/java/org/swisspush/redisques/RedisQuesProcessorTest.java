@@ -1,5 +1,7 @@
 package org.swisspush.redisques;
 
+import com.jayway.awaitility.Awaitility;
+import com.jayway.awaitility.Duration;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Handler;
@@ -22,8 +24,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.swisspush.redisques.util.RedisquesAPI.*;
 
 /**
@@ -310,6 +314,50 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
         eventBusSend(operation, reply -> {
             context.assertEquals(OK, reply.result().body().getString(STATUS));
         });
+    }
+
+    @Test
+    public void queueProcessorShouldBeNotifiedWithNonLockedQueue(TestContext context) throws Exception {
+        Async async = context.async();
+        flushAll();
+
+        String queue = "queue1";
+        final AtomicBoolean processorCalled = new AtomicBoolean(false);
+
+        queueProcessor.handler(event -> processorCalled.set(true));
+
+        eventBusSend(buildEnqueueOperation(queue, "hello"), reply -> {
+            context.assertEquals(OK, reply.result().body().getString(STATUS));
+        });
+
+        // after at most 5 seconds, the processor-address consumer should have been called
+        Awaitility.await().atMost(Duration.FIVE_SECONDS).until(processorCalled::get, equalTo(true));
+
+        async.complete();
+    }
+
+
+    @Test
+    public void queueProcessorShouldNotBeNotNotifiedWithLockedQueue(TestContext context) throws Exception {
+        Async async = context.async();
+        flushAll();
+
+        String queue = "queue1";
+        final AtomicBoolean processorCalled = new AtomicBoolean(false);
+
+        lockQueue(queue);
+
+
+        queueProcessor.handler(event -> processorCalled.set(true));
+
+        eventBusSend(buildEnqueueOperation(queue, "hello"), reply -> {
+            context.assertEquals(OK, reply.result().body().getString(STATUS));
+        });
+
+        // after at most 5 seconds, the processor-address consumer should not have been called
+        Awaitility.await().atMost(Duration.FIVE_SECONDS).until(processorCalled::get, equalTo(false));
+
+        async.complete();
     }
 
     private void sleep(int millis) {
