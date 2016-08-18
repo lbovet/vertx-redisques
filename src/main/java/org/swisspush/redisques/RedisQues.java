@@ -231,7 +231,13 @@ public class RedisQues extends AbstractVerticle {
                         redisClient.hget(redisques_locks, event.body().getJsonObject(PAYLOAD).getString(QUEUENAME),new GetLockHandler(event));
                         break;
                     case deleteLock:
-                        redisClient.hdel(redisques_locks, event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new DeleteLockHandler(event));
+                        String queueName = event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
+                        redisClient.exists(queuesPrefix + queueName, event1 -> {
+                            if(event1.succeeded() && event1.result() == 1){
+                                notifyConsumer(queueName);
+                            }
+                            redisClient.hdel(redisques_locks, queueName, new DeleteLockHandler(event));
+                        });
                         break;
                     case getQueueItemsCount:
                         redisClient.llen(queuesPrefix + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new GetQueueItemsCountHandler(event));

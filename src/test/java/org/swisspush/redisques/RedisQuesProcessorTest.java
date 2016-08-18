@@ -347,17 +347,45 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
 
         lockQueue(queue);
 
-
         queueProcessor.handler(event -> processorCalled.set(true));
 
         eventBusSend(buildEnqueueOperation(queue, "hello"), reply -> {
             context.assertEquals(OK, reply.result().body().getString(STATUS));
+            sleep(5000);
+            context.assertFalse(processorCalled.get(), "QueueProcessor should not have been called after enqueue into a locked queue");
+            async.complete();
+        });
+    }
+
+    @Test
+    public void queueProcessorShouldHaveBeenNotifiedImmediatelyAfterQueueUnlock(TestContext context) throws Exception {
+        Async async = context.async();
+        flushAll();
+
+        String queue = "queue1";
+        final AtomicBoolean processorCalled = new AtomicBoolean(false);
+
+        lockQueue(queue);
+
+        queueProcessor.handler(event -> {
+            processorCalled.set(true);
         });
 
-        // after at most 5 seconds, the processor-address consumer should not have been called
-        Awaitility.await().atMost(Duration.FIVE_SECONDS).until(processorCalled::get, equalTo(false));
+        eventBusSend(buildEnqueueOperation(queue, "hello"), reply -> {
+            context.assertEquals(OK, reply.result().body().getString(STATUS));
 
-        async.complete();
+            sleep(5000);
+
+            // after at most 5 seconds, the processor-address consumer should not have been called
+            context.assertFalse(processorCalled.get(), "QueueProcessor should not have been called after enqueue into a locked queue");
+
+            eventBusSend(buildDeleteLockOperation(queue), event -> {
+                context.assertEquals(OK, event.result().body().getString(STATUS));
+                sleep(100);
+                context.assertTrue(processorCalled.get(), "QueueProcessor should have been called immediately after queue unlock");
+                async.complete();
+            });
+        });
     }
 
     private void sleep(int millis) {
