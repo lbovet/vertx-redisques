@@ -15,11 +15,11 @@ import redis.clients.jedis.Jedis;
 
 import static com.jayway.restassured.RestAssured.given;
 import static com.jayway.restassured.RestAssured.when;
-import static org.hamcrest.CoreMatchers.hasItem;
-import static org.hamcrest.CoreMatchers.hasItems;
-import static org.hamcrest.CoreMatchers.not;
+import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.collection.IsEmptyCollection.empty;
+import static org.hamcrest.number.OrderingComparison.greaterThan;
 import static org.swisspush.redisques.util.RedisquesAPI.buildEnqueueOperation;
+import static org.swisspush.redisques.util.RedisquesAPI.buildPutLockOperation;
 
 /**
  * Tests for the {@link RedisquesHttpRequestHandler} class
@@ -63,6 +63,16 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
     }
 
     @Test
+    public void testUnknownRequestUrl(TestContext context) {
+        Async async = context.async();
+        when()
+                .get("/an/unknown/path/")
+                .then().assertThat()
+                .statusCode(405);
+        async.complete();
+    }
+
+    @Test
     public void listQueues(TestContext context) {
         Async async = context.async();
         flushAll();
@@ -70,12 +80,12 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
             eventBusSend(buildEnqueueOperation("queue_2", "item2_1"), m2 -> {
                 eventBusSend(buildEnqueueOperation("queue_3", "item3_1"), m3 -> {
                     when()
-                        .get("/queuing/queues/")
-                        .then().assertThat()
-                        .statusCode(200)
-                        .body(
-                            "queues", hasItems("queue_1", "queue_2", "queue_3")
-                        );
+                            .get("/queuing/queues/")
+                            .then().assertThat()
+                            .statusCode(200)
+                            .body(
+                                    "queues", hasItems("queue_1", "queue_2", "queue_3")
+                            );
                     async.complete();
                 });
             });
@@ -159,10 +169,157 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
     public void deleteAllQueueItemsOfNonExistingQueue(TestContext context) {
         Async async = context.async();
         flushAll();
-        when().delete("/queuing/queues/notExistingQueue_"+System.currentTimeMillis())
+        when().delete("/queuing/queues/notExistingQueue_" + System.currentTimeMillis())
                 .then().assertThat()
                 .statusCode(200);
         async.complete();
     }
 
+    @Test
+    public void getAllLocksWhenNoLocksPresent(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        when().get("/queuing/locks/")
+                .then().assertThat()
+                .statusCode(200)
+                .body("locks", empty());
+        async.complete();
+    }
+
+    @Test
+    public void getAllLocks(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        eventBusSend(buildPutLockOperation("queue1", "someuser"), message -> {
+            eventBusSend(buildPutLockOperation("queue2", "someuser"), message2 -> {
+                when().get("/queuing/locks/")
+                        .then().assertThat()
+                        .statusCode(200)
+                        .body("locks", hasItems("queue1", "queue2"));
+                async.complete();
+            });
+        });
+    }
+
+    @Test
+    public void getSingleLockNotExisting(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        when().get("/queuing/locks/notExisiting_" + System.currentTimeMillis())
+                .then().assertThat()
+                .statusCode(404)
+                .body(containsString("No such lock"));
+        async.complete();
+    }
+
+    @Test
+    public void getSingleLock(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        long ts = System.currentTimeMillis();
+        String lock = "myLock_" + ts;
+        String requestedBy = "someuser_" + ts;
+        eventBusSend(buildPutLockOperation(lock, requestedBy), message -> {
+            when().get("/queuing/locks/" + lock)
+                    .then().assertThat()
+                    .statusCode(200)
+                    .body(
+                            "requestedBy", equalTo(requestedBy),
+                            "timestamp", greaterThan(ts)
+                    );
+            async.complete();
+        });
+    }
+
+    @Test
+    public void addLock(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        long ts = System.currentTimeMillis();
+        String lock = "myLock_" + ts;
+        String requestedBy = "someuser_" + ts;
+
+        context.assertFalse(jedis.hexists(REDISQUES_LOCKS, lock));
+
+        given()
+                .header("x-rp-usr", requestedBy)
+                .body("{}")
+                .when()
+                .put("/queuing/locks/" + lock).then().assertThat().statusCode(200);
+
+        context.assertTrue(jedis.hexists(REDISQUES_LOCKS, lock));
+        assertLockContent(context, lock, requestedBy);
+
+        async.complete();
+    }
+
+    @Test
+    public void addLockWrongUserHeader(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        long ts = System.currentTimeMillis();
+        String lock = "myLock_" + ts;
+        String requestedBy = "someuser_" + ts;
+
+        context.assertFalse(jedis.hexists(REDISQUES_LOCKS, lock));
+
+        given()
+                .header("wrong-user-header", requestedBy)
+                .body("{}")
+                .when()
+                .put("/queuing/locks/" + lock).then().assertThat().statusCode(200);
+
+        context.assertTrue(jedis.hexists(REDISQUES_LOCKS, lock));
+        assertLockContent(context, lock, "Unknown");
+
+        async.complete();
+    }
+
+    @Test
+    public void addLockNoUserHeader(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String lock = "myLock_" + System.currentTimeMillis();
+
+        context.assertFalse(jedis.hexists(REDISQUES_LOCKS, lock));
+
+        given()
+                .body("{}")
+                .when()
+                .put("/queuing/locks/" + lock).then().assertThat().statusCode(200);
+
+        context.assertTrue(jedis.hexists(REDISQUES_LOCKS, lock));
+        assertLockContent(context, lock, "Unknown");
+
+        async.complete();
+    }
+
+    @Test
+    public void deleteSingleLockNotExisting(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        when().delete("/queuing/locks/notExisiting_" + System.currentTimeMillis()).then().assertThat().statusCode(200);
+        async.complete();
+    }
+
+    @Test
+    public void deleteSingleLock(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        long ts = System.currentTimeMillis();
+        String lock = "myLock_" + ts;
+        String requestedBy = "someuser_" + ts;
+        eventBusSend(buildPutLockOperation(lock, requestedBy), message -> {
+
+            context.assertTrue(jedis.hexists(REDISQUES_LOCKS, lock));
+
+            when().delete("/queuing/locks/" + lock)
+                    .then().assertThat()
+                    .statusCode(200);
+
+            context.assertFalse(jedis.hexists(REDISQUES_LOCKS, lock));
+
+            async.complete();
+        });
+    }
 }

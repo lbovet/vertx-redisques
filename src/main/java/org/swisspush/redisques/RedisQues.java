@@ -299,8 +299,8 @@ public class RedisQues extends AbstractVerticle {
     private void registerHttpRequestHandler(RedisquesConfiguration modConfig){
         log.info("Enable http request handler: " + modConfig.getHttpRequestHandlerEnabled());
         if(modConfig.getHttpRequestHandlerEnabled()){
-            if(modConfig.getHttpRequestHandlerPort() != null){
-                RedisquesHttpRequestHandler handler = new RedisquesHttpRequestHandler(vertx, modConfig.getHttpRequestHandlerPrefix(), modConfig.getAddress());
+            if(modConfig.getHttpRequestHandlerPort() != null && modConfig.getHttpRequestHandlerUserHeader() != null){
+                RedisquesHttpRequestHandler handler = new RedisquesHttpRequestHandler(vertx, modConfig);
                 // in Vert.x 2x 100-continues was activated per default, in vert.x 3x it is off per default.
                 HttpServerOptions options = new HttpServerOptions().setHandle100ContinueAutomatically(true);
                 vertx.createHttpServer(options).requestHandler(handler).listen(modConfig.getHttpRequestHandlerPort(), result -> {
@@ -311,7 +311,7 @@ public class RedisQues extends AbstractVerticle {
                     }
                 });
             } else {
-                log.error("Configured to enable http request handler but no port configuration provided");
+                log.error("Configured to enable http request handler but no port configuration and/or user header configuration provided");
             }
         }
     }

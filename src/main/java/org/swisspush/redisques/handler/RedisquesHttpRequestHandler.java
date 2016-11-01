@@ -13,6 +13,7 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import org.swisspush.redisques.util.RedisquesConfiguration;
 import org.swisspush.redisques.util.StatusCode;
 
 import java.util.List;
@@ -35,11 +36,15 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
     public static final String CONTENT_TYPE = "content-type";
 
     private final String redisquesAddress;
+    private final String userHeader;
 
-    public RedisquesHttpRequestHandler(Vertx vertx, String prefix, String redisquesAddress) {
+    public RedisquesHttpRequestHandler(Vertx vertx, RedisquesConfiguration modConfig) {
         this.router = Router.router(vertx);
         this.eventBus = vertx.eventBus();
-        this.redisquesAddress = redisquesAddress;
+        this.redisquesAddress = modConfig.getAddress();
+        this.userHeader = modConfig.getHttpRequestHandlerUserHeader();
+
+        final String prefix = modConfig.getHttpRequestHandlerPrefix();
 
         /*
          * List queuing features
@@ -73,6 +78,42 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         /*
          * Get single queue item
          */
+        //TODO implmement
+
+        /*
+         * Replace single queue item
+         */
+        //TODO implmement
+
+        /*
+         * Delete single queue item
+         */
+        //TODO implmement
+
+        /*
+         * Add queue item
+         */
+        //TODO implmement
+
+        /*
+         * Get all locks
+         */
+        router.getWithRegex(prefix + "/locks/").handler(this::getAllLocks);
+
+        /*
+         * Add lock
+         */
+        router.putWithRegex(prefix + "/locks/[^/]+").handler(this::addLock);
+
+        /*
+         * Get single lock
+         */
+        router.getWithRegex(prefix + "/locks/[^/]+").handler(this::getSingleLock);
+
+        /*
+         * Delete single lock
+         */
+        router.deleteWithRegex(prefix + "/locks/[^/]+").handler(this::deleteSingleLock);
 
         router.routeWithRegex(".*").handler(this::respondMethodNotAllowed);
     }
@@ -84,6 +125,56 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
 
     private void respondMethodNotAllowed(RoutingContext ctx){
         respondWith(StatusCode.METHOD_NOT_ALLOWED, ctx.request());
+    }
+
+    private void getAllLocks(RoutingContext ctx){
+        eventBus.send(redisquesAddress, buildGetAllLocksOperation(), new Handler<AsyncResult<Message<JsonObject>>>() {
+            @Override
+            public void handle(AsyncResult<Message<JsonObject>> reply) {
+                if (OK.equals(reply.result().body().getString(STATUS))) {
+                    jsonResponse(ctx.response(), reply.result().body().getJsonObject(VALUE));
+                } else {
+                    respondWith(StatusCode.NOT_FOUND, ctx.request());
+                }
+            }
+        });
+    }
+
+    private void addLock(RoutingContext ctx){
+        String queue = lastPart(ctx.request().path(), "/");
+        eventBus.send(redisquesAddress, buildPutLockOperation(queue, extractUser(ctx.request())), new Handler<AsyncResult<Message<JsonObject>>>() {
+            @Override
+            public void handle(AsyncResult<Message<JsonObject>> reply) {
+                checkReply(reply.result(), ctx.request(), StatusCode.BAD_REQUEST);
+            }
+        });
+    }
+
+    private void getSingleLock(RoutingContext ctx){
+        String queue = lastPart(ctx.request().path(), "/");
+        eventBus.send(redisquesAddress, buildGetLockOperation(queue), new Handler<AsyncResult<Message<JsonObject>>>() {
+            @Override
+            public void handle(AsyncResult<Message<JsonObject>> reply) {
+                if (OK.equals(reply.result().body().getString(STATUS))) {
+                    ctx.response().putHeader(CONTENT_TYPE, APPLICATION_JSON);
+                    ctx.response().end(reply.result().body().getString(VALUE));
+                } else {
+                    ctx.response().setStatusCode(StatusCode.NOT_FOUND.getStatusCode());
+                    ctx.response().setStatusMessage(StatusCode.NOT_FOUND.getStatusMessage());
+                    ctx.response().end(NO_SUCH_LOCK);
+                }
+            }
+        });
+    }
+
+    private void deleteSingleLock(RoutingContext ctx){
+        String queue = lastPart(ctx.request().path(), "/");
+        eventBus.send(redisquesAddress, buildDeleteLockOperation(queue), new Handler<AsyncResult<Message<JsonObject>>>() {
+            @Override
+            public void handle(AsyncResult<Message<JsonObject>> reply) {
+                checkReply(reply.result(), ctx.request(), StatusCode.INTERNAL_SERVER_ERROR);
+            }
+        });
     }
 
     private void listQueues(RoutingContext ctx){
@@ -152,5 +243,23 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
     private void jsonResponse(HttpServerResponse response, JsonObject object) {
         response.putHeader(CONTENT_TYPE, APPLICATION_JSON);
         response.end(object.encode());
+    }
+
+    private String extractUser(HttpServerRequest request) {
+        String user = request.headers().get(userHeader);
+        if(user == null){
+            user = "Unknown";
+        }
+        return user;
+    }
+
+    private void checkReply(Message<JsonObject> reply, HttpServerRequest request, StatusCode statusCode) {
+        if (OK.equals(reply.body().getString(STATUS))) {
+            request.response().end();
+        } else {
+            request.response().setStatusCode(statusCode.getStatusCode());
+            request.response().setStatusMessage(statusCode.getStatusMessage());
+            request.response().end(statusCode.getStatusMessage());
+        }
     }
 }

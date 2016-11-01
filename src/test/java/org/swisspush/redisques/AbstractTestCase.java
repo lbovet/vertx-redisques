@@ -49,6 +49,17 @@ public abstract class AbstractTestCase {
         context.assertEquals(keyCount, jedis.keys(prefix+"*").size());
     }
 
+    protected void assertLockContent(TestContext context, String queuename, String expectedRequestedByValue){
+        String item = jedis.hget(REDISQUES_LOCKS, queuename);
+        context.assertNotNull(item);
+        if(item != null){
+            JsonObject lockInfo = new JsonObject(item);
+            context.assertNotNull(lockInfo.getString(REQUESTED_BY), "Property '"+REQUESTED_BY+"' missing");
+            context.assertNotNull(lockInfo.getLong(TIMESTAMP), "Property '"+TIMESTAMP+"' missing");
+            context.assertEquals(expectedRequestedByValue, lockInfo.getString(REQUESTED_BY), "Property '"+REQUESTED_BY+"' has wrong value");
+        }
+    }
+
     @BeforeClass
     public static void config(TestContext context) {
         if(!RedisEmbeddedConfiguration.useExternalRedis()) {

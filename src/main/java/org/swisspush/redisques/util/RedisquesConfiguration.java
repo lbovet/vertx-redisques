@@ -22,6 +22,7 @@ public class RedisquesConfiguration {
     private boolean httpRequestHandlerEnabled;
     private String httpRequestHandlerPrefix;
     private Integer httpRequestHandlerPort;
+    private String httpRequestHandlerUserHeader;
 
     private static final int DEFAULT_CHECK_INTERVAL = 60; // 60s
 
@@ -37,6 +38,7 @@ public class RedisquesConfiguration {
     public static final String PROP_HTTP_REQUEST_HANDLER_ENABLED = "httpRequestHandlerEnabled";
     public static final String PROP_HTTP_REQUEST_HANDLER_PREFIX = "httpRequestHandlerPrefix";
     public static final String PROP_HTTP_REQUEST_HANDLER_PORT = "httpRequestHandlerPort";
+    public static final String PROP_HTTP_REQUEST_HANDLER_USER_HEADER = "httpRequestHandlerUserHeader";
 
     private Logger log = LoggerFactory.getLogger(RedisquesConfiguration.class);
 
@@ -56,11 +58,14 @@ public class RedisquesConfiguration {
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
                                   String redisHost, int redisPort, String redisEncoding, int checkInterval, int processorTimeout) {
-        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, checkInterval, processorTimeout, false, "", null);
+        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, checkInterval, processorTimeout, false, "", null, null);
     }
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
-                                  String redisHost, int redisPort, String redisEncoding, int checkInterval, int processorTimeout, boolean httpRequestHandlerEnabled, String httpRequestHandlerPrefix, Integer httpRequestHandlerPort) {
+                                  String redisHost, int redisPort, String redisEncoding, int checkInterval,
+                                  int processorTimeout, boolean httpRequestHandlerEnabled,
+                                  String httpRequestHandlerPrefix, Integer httpRequestHandlerPort,
+                                  String httpRequestHandlerUserHeader) {
         this.address = address;
         this.redisPrefix = redisPrefix;
         this.processorAddress = processorAddress;
@@ -80,6 +85,7 @@ public class RedisquesConfiguration {
         this.httpRequestHandlerEnabled = httpRequestHandlerEnabled;
         this.httpRequestHandlerPrefix = httpRequestHandlerPrefix;
         this.httpRequestHandlerPort = httpRequestHandlerPort;
+        this.httpRequestHandlerUserHeader = httpRequestHandlerUserHeader;
     }
 
     public static RedisquesConfigurationBuilder with(){
@@ -90,7 +96,7 @@ public class RedisquesConfiguration {
         this(builder.address, builder.redisPrefix, builder.processorAddress, builder.refreshPeriod,
                 builder.redisHost, builder.redisPort, builder.redisEncoding, builder.checkInterval,
                 builder.processorTimeout, builder.httpRequestHandlerEnabled, builder.httpRequestHandlerPrefix,
-                builder.httpRequestHandlerPort);
+                builder.httpRequestHandlerPort, builder.httpRequestHandlerUserHeader);
     }
 
     public JsonObject asJsonObject(){
@@ -107,6 +113,7 @@ public class RedisquesConfiguration {
         obj.put(PROP_HTTP_REQUEST_HANDLER_ENABLED, getHttpRequestHandlerEnabled());
         obj.put(PROP_HTTP_REQUEST_HANDLER_PREFIX, getHttpRequestHandlerPrefix());
         obj.put(PROP_HTTP_REQUEST_HANDLER_PORT, getHttpRequestHandlerPort());
+        obj.put(PROP_HTTP_REQUEST_HANDLER_USER_HEADER, getHttpRequestHandlerUserHeader());
         return obj;
     }
 
@@ -148,6 +155,9 @@ public class RedisquesConfiguration {
         if(json.containsKey(PROP_HTTP_REQUEST_HANDLER_PORT)){
             builder.httpRequestHandlerPort(json.getInteger(PROP_HTTP_REQUEST_HANDLER_PORT));
         }
+        if(json.containsKey(PROP_HTTP_REQUEST_HANDLER_USER_HEADER)){
+            builder.httpRequestHandlerUserHeader(json.getString(PROP_HTTP_REQUEST_HANDLER_USER_HEADER));
+        }
         return builder.build();
     }
 
@@ -182,6 +192,8 @@ public class RedisquesConfiguration {
     public String getHttpRequestHandlerPrefix() { return httpRequestHandlerPrefix; }
 
     public Integer getHttpRequestHandlerPort() { return httpRequestHandlerPort; }
+
+    public String getHttpRequestHandlerUserHeader() { return httpRequestHandlerUserHeader; }
 
     /**
      * Gets the value for the vertx periodic timer.
@@ -225,6 +237,7 @@ public class RedisquesConfiguration {
         private boolean httpRequestHandlerEnabled;
         private String httpRequestHandlerPrefix;
         private Integer httpRequestHandlerPort;
+        private String httpRequestHandlerUserHeader;
 
         public RedisquesConfigurationBuilder(){
             this.address = "redisques";
@@ -239,6 +252,7 @@ public class RedisquesConfiguration {
             this.httpRequestHandlerEnabled = false;
             this.httpRequestHandlerPrefix = "/queuing";
             this.httpRequestHandlerPort = 7070;
+            this.httpRequestHandlerUserHeader = "x-rp-usr";
         }
 
         public RedisquesConfigurationBuilder address(String address){
@@ -298,6 +312,11 @@ public class RedisquesConfiguration {
 
         public RedisquesConfigurationBuilder httpRequestHandlerPort(Integer httpRequestHandlerPort){
             this.httpRequestHandlerPort = httpRequestHandlerPort;
+            return this;
+        }
+
+        public RedisquesConfigurationBuilder httpRequestHandlerUserHeader(String httpRequestHandlerUserHeader){
+            this.httpRequestHandlerUserHeader = httpRequestHandlerUserHeader;
             return this;
         }
 
