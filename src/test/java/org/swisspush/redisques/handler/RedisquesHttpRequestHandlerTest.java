@@ -58,8 +58,8 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
     }
 
     @After
-    public void undeployRedisques(){
-        vertx.undeploy(deploymentId);
+    public void tearDown(TestContext context) {
+        vertx.close(context.asyncAssertSuccess());
     }
 
     @Test
