@@ -23,7 +23,12 @@ import static org.swisspush.redisques.util.RedisquesAPI.REQUESTED_BY;
 @RunWith(VertxUnitRunner.class)
 public abstract class AbstractTestCase {
 
-    static Logger log = LoggerFactory.getLogger(AbstractTestCase.class);
+    protected static final String QUEUES_PREFIX = "redisques:queues:";
+    protected static final String TIMESTAMP = "timestamp";
+    protected static final String REDISQUES_LOCKS = "redisques:locks";
+    protected static final String PROCESSOR_ADDRESS = "processor-address";
+
+    protected static Logger log = LoggerFactory.getLogger(AbstractTestCase.class);
 
     protected static Vertx vertx;
     protected static Jedis jedis;

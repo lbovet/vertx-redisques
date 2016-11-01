@@ -22,11 +22,6 @@ import static org.swisspush.redisques.util.RedisquesAPI.*;
  */
 public class RedisQuesTest extends AbstractTestCase {
 
-    public static final String TIMESTAMP = "timestamp";
-    public static final String QUEUES_PREFIX = "redisques:queues:";
-    public static final String REDISQUES_LOCKS = "redisques:locks";
-    public static final String PROCESSOR_ADDRESS = "processor-address";
-
     @Rule
     public Timeout rule = Timeout.seconds(5);
 
