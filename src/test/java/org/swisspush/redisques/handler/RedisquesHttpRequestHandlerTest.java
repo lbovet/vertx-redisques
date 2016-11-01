@@ -1,14 +1,13 @@
 package org.swisspush.redisques.handler;
 
+import com.jayway.restassured.RestAssured;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.Timeout;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.swisspush.redisques.AbstractTestCase;
 import org.swisspush.redisques.RedisQues;
 import org.swisspush.redisques.util.RedisquesConfiguration;
@@ -30,18 +29,22 @@ import static org.swisspush.redisques.util.RedisquesAPI.buildEnqueueOperation;
 public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
 
     @Rule
-    public Timeout rule = Timeout.seconds(3);
+    public Timeout rule = Timeout.seconds(15);
 
-    @BeforeClass
-    public static void deployRedisques(TestContext context) {
+    @Before
+    public void deployRedisques(TestContext context) {
+        Async async = context.async();
         vertx = Vertx.vertx();
+
+        RestAssured.baseURI = "http://localhost";
+        RestAssured.port = Integer.getInteger("http.port", 7070);
 
         JsonObject config = RedisquesConfiguration.with()
                 .processorAddress("processor-address")
                 .redisEncoding("ISO-8859-1")
                 .refreshPeriod(2)
                 .httpRequestHandlerEnabled(true)
-                .httpRequestHandlerPort(8080)
+                .httpRequestHandlerPort(7070)
                 .build()
                 .asJsonObject();
 
@@ -50,7 +53,13 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
             deploymentId = event;
             log.info("vert.x Deploy - " + redisQues.getClass().getSimpleName() + " was successful.");
             jedis = new Jedis("localhost", 6379, 5000);
+            async.complete();
         }));
+    }
+
+    @After
+    public void undeployRedisques(){
+        vertx.undeploy(deploymentId);
     }
 
     @Test
