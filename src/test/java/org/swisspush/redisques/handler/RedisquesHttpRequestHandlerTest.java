@@ -205,6 +205,57 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
     }
 
     @Test
+    public void getSingleQueueItemWithNonNumericIndex(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        // try to get with non-numeric index
+        String nonnumericIndex = "xx";
+        when().get("/queuing/queues/"+queueName+"/"+nonnumericIndex).then().assertThat().statusCode(405);
+
+        async.complete();
+    }
+
+    @Test
+    public void getSingleQueueItemWithNonExistingIndex(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        // try to get with not existing index
+        String notExistingIndex = "10";
+        when().get("/queuing/queues/"+queueName+"/"+notExistingIndex).then().assertThat().statusCode(404).body(containsString("Not Found"));
+
+        async.complete();
+    }
+
+    @Test
+    public void getSingleQueueItem(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        String numericIndex = "0";
+        when().get("/queuing/queues/"+queueName+"/"+numericIndex).then().assertThat()
+                .statusCode(200)
+                .header("content-type", "application/json")
+                .body(equalTo(new JsonObject(queueItemValid).toString()));
+
+        async.complete();
+    }
+
+    @Test
     public void deleteQueueItemWithNonNumericIndex(TestContext context) {
         Async async = context.async();
         flushAll();

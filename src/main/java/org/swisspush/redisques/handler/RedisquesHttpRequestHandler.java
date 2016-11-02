@@ -7,6 +7,7 @@ import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
+import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
@@ -28,13 +29,14 @@ import static org.swisspush.redisques.util.RedisquesAPI.*;
  */
 public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
 
+    private static final String UTF_8 = "UTF-8";
     private static Logger log = LoggerFactory.getLogger(RedisquesHttpRequestHandler.class);
 
     private Router router;
     private EventBus eventBus;
 
-    public static final String APPLICATION_JSON = "application/json";
-    public static final String CONTENT_TYPE = "content-type";
+    private static final String APPLICATION_JSON = "application/json";
+    private static final String CONTENT_TYPE = "content-type";
 
     private final String redisquesAddress;
     private final String userHeader;
@@ -79,7 +81,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         /*
          * Get single queue item
          */
-        //TODO implmement
+        router.getWithRegex(prefix + "/queues/([^/]+)/[0-9]+").handler(this::getSingleQueueItem);
 
         /*
          * Replace single queue item
@@ -282,6 +284,25 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
+    private void getSingleQueueItem(RoutingContext ctx) {
+        final String queue = lastPart(ctx.request().path().substring(0, ctx.request().path().length() - 2), "/");
+        final int index = Integer.parseInt(lastPart(ctx.request().path(), "/"));
+        eventBus.send(redisquesAddress, buildGetQueueItemOperation(queue, index), new Handler<AsyncResult<Message<JsonObject>>>() {
+            @Override
+            public void handle(AsyncResult<Message<JsonObject>> reply) {
+                JsonObject replyBody = reply.result().body();
+                if (OK.equals(replyBody.getString(STATUS))) {
+                    ctx.response().putHeader(CONTENT_TYPE, APPLICATION_JSON);
+                    ctx.response().end(decode(reply.result().body().getString(VALUE)));
+                } else {
+                    ctx.response().setStatusCode(StatusCode.NOT_FOUND.getStatusCode());
+                    ctx.response().setStatusMessage(StatusCode.NOT_FOUND.getStatusMessage());
+                    ctx.response().end("Not Found");
+                }
+            }
+        });
+    }
+
     private void deleteQueueItem(RoutingContext ctx) {
         final String queue = part(ctx.request().path(), "/", 2);
         final int index = Integer.parseInt(lastPart(ctx.request().path(), "/"));
@@ -380,7 +401,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         }
 
         if (payloadString != null) {
-            object.put(PAYLOAD, payloadString.getBytes(Charset.forName("UTF-8")));
+            object.put(PAYLOAD, payloadString.getBytes(Charset.forName(UTF_8)));
             object.remove("payloadString");
             object.remove("payloadObject");
         }
@@ -405,6 +426,32 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         }
         object.put("headers", newHeaders);
 
+        return object.toString();
+    }
+
+    /**
+     * Decode the payload if the content-type is text or json.
+     *
+     * @param encoded encoded
+     * @return String
+     */
+    public String decode(String encoded) {
+        JsonObject object = new JsonObject(encoded);
+        JsonArray headers = object.getJsonArray("headers");
+        for (Object headerObj : headers) {
+            JsonArray header = (JsonArray) headerObj;
+            String key = header.getString(0);
+            String value = header.getString(1);
+            if (key.equalsIgnoreCase(CONTENT_TYPE) && (value.contains("text/") || value.contains(APPLICATION_JSON))) {
+                try {
+                    object.put("payloadObject", new JsonObject(new String(object.getBinary(PAYLOAD), Charset.forName(UTF_8))));
+                } catch (DecodeException e) {
+                    object.put("payloadString", new String(object.getBinary(PAYLOAD), Charset.forName(UTF_8)));
+                }
+                object.remove(PAYLOAD);
+                break;
+            }
+        }
         return object.toString();
     }
 }
