@@ -73,6 +73,36 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
     }
 
     @Test
+    public void getQueuesCount(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        eventBusSend(buildEnqueueOperation("queue_1", "item1_1"), m1 -> {
+            eventBusSend(buildEnqueueOperation("queue_2", "item2_1"), m2 -> {
+                eventBusSend(buildEnqueueOperation("queue_3", "item3_1"), m3 -> {
+                    when()
+                            .get("/queuing/queues/?count")
+                            .then().assertThat()
+                            .statusCode(200)
+                            .body("count", equalTo(3));
+                    async.complete();
+                });
+            });
+        });
+    }
+
+    @Test
+    public void getQueuesCountNoQueues(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        when()
+                .get("/queuing/queues/?count")
+                .then().assertThat()
+                .statusCode(200)
+                .body("count", equalTo(0));
+        async.complete();
+    }
+
+    @Test
     public void listQueues(TestContext context) {
         Async async = context.async();
         flushAll();
@@ -90,6 +120,116 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
                 });
             });
         });
+    }
+
+    @Test
+    public void addQueueItemValidBody(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        String queueItem = "{\n" +
+                "  \"method\": \"PUT\",\n" +
+                "  \"uri\": \"/some/url/123/456\",\n" +
+                "  \"headers\": [\n" +
+                "    [\n" +
+                "      \"Accept\",\n" +
+                "      \"text/plain, */*; q=0.01\"\n" +
+                "    ],\n" +
+                "    [\n" +
+                "      \"Content-Type\",\n" +
+                "      \"application/json\"\n" +
+                "    ],\n" +
+                "    [\n" +
+                "      \"Accept-Charset\",\n" +
+                "      \"utf-8, iso-8859-1, utf-16, *;q=0.7\"\n" +
+                "    ]\n" +
+                "  ],\n" +
+                "  \"queueTimestamp\": 1477983671291,\n" +
+                "  \"payloadObject\": {\n" +
+                "    \"actionTime\": \"2016-11-01T08:00:02.024+01:00\",\n" +
+                "    \"type\": 2\n" +
+                "  }\n" +
+                "}";
+
+        given().body(queueItem).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        given().body(queueItem).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(2L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        async.complete();
+    }
+
+    @Test
+    public void addQueueItemInvalidBody(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        String queueItem = "\n" +
+                "  \"method\": \"PUT\",\n" +
+                "  \"uri\": \"/some/url/123/456\",\n" +
+                "  \"headers\": [\n" +
+                "    [\n" +
+                "      \"Accept\",\n" +
+                "      \"text/plain, */*; q=0.01\"\n" +
+                "    ],\n" +
+                "    [\n" +
+                "      \"Content-Type\",\n" +
+                "      \"application/json\"\n" +
+                "    ],\n" +
+                "    [\n" +
+                "      \"Accept-Charset\",\n" +
+                "      \"utf-8, iso-8859-1, utf-16, *;q=0.7\"\n" +
+                "    ]\n" +
+                "  ],\n" +
+                "  \"queueTimestamp\": 1477983671291,\n" +
+                "  \"payloadObject\": {\n" +
+                "    \"actionTime\": \"2016-11-01T08:00:02.024+01:00\",\n" +
+                "    \"type\": 2\n" +
+                "  }\n" +
+                "}";
+
+        given().body(queueItem).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(400);
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        context.assertEquals(0L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        async.complete();
+    }
+
+    @Test
+    public void getQueueItemsCount(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        eventBusSend(buildEnqueueOperation("queueEnqueue", "helloEnqueue"), message -> {
+            eventBusSend(buildEnqueueOperation("queueEnqueue", "helloEnqueue2"), message2 -> {
+                when()
+                        .get("/queuing/queues/queueEnqueue?count")
+                        .then().assertThat()
+                        .statusCode(200)
+                        .body("count", equalTo(2));
+                async.complete();
+            });
+        });
+    }
+
+    @Test
+    public void getQueueItemsCountOfUnknownQueue(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        when()
+                .get("/queuing/queues/unknownQueue?count")
+                .then().assertThat()
+                .statusCode(200)
+                .body("count", equalTo(0));
+        async.complete();
     }
 
     @Test

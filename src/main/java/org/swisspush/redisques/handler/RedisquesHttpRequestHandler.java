@@ -16,6 +16,7 @@ import io.vertx.ext.web.RoutingContext;
 import org.swisspush.redisques.util.RedisquesConfiguration;
 import org.swisspush.redisques.util.StatusCode;
 
+import java.nio.charset.Charset;
 import java.util.List;
 
 import static org.swisspush.redisques.util.RedisquesAPI.*;
@@ -61,14 +62,14 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
 
         /*
-         * List queues
+         * List or count queues
          */
-        router.get(prefix + "/queues/").handler(this::listQueues);
+        router.get(prefix + "/queues/").handler(this::listOrCountQueues);
 
         /*
-         * List queue items
+         * List or count queue items
          */
-        router.getWithRegex(prefix + "/queues/[^/]+").handler(this::listQueueItems);
+        router.getWithRegex(prefix + "/queues/[^/]+").handler(this::listOrCountQueueItems);
 
         /*
          * Delete all queue items
@@ -93,7 +94,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         /*
          * Add queue item
          */
-        //TODO implmement
+        router.postWithRegex(prefix + "/queues/([^/]+)/").handler(this::addQueueItem);
 
         /*
          * Get all locks
@@ -123,11 +124,11 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         router.accept(request);
     }
 
-    private void respondMethodNotAllowed(RoutingContext ctx){
+    private void respondMethodNotAllowed(RoutingContext ctx) {
         respondWith(StatusCode.METHOD_NOT_ALLOWED, ctx.request());
     }
 
-    private void getAllLocks(RoutingContext ctx){
+    private void getAllLocks(RoutingContext ctx) {
         eventBus.send(redisquesAddress, buildGetAllLocksOperation(), new Handler<AsyncResult<Message<JsonObject>>>() {
             @Override
             public void handle(AsyncResult<Message<JsonObject>> reply) {
@@ -140,7 +141,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
-    private void addLock(RoutingContext ctx){
+    private void addLock(RoutingContext ctx) {
         String queue = lastPart(ctx.request().path(), "/");
         eventBus.send(redisquesAddress, buildPutLockOperation(queue, extractUser(ctx.request())), new Handler<AsyncResult<Message<JsonObject>>>() {
             @Override
@@ -150,7 +151,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
-    private void getSingleLock(RoutingContext ctx){
+    private void getSingleLock(RoutingContext ctx) {
         String queue = lastPart(ctx.request().path(), "/");
         eventBus.send(redisquesAddress, buildGetLockOperation(queue), new Handler<AsyncResult<Message<JsonObject>>>() {
             @Override
@@ -167,7 +168,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
-    private void deleteSingleLock(RoutingContext ctx){
+    private void deleteSingleLock(RoutingContext ctx) {
         String queue = lastPart(ctx.request().path(), "/");
         eventBus.send(redisquesAddress, buildDeleteLockOperation(queue), new Handler<AsyncResult<Message<JsonObject>>>() {
             @Override
@@ -177,7 +178,46 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
-    private void listQueues(RoutingContext ctx){
+    private void getQueuesCount(RoutingContext ctx) {
+        eventBus.send(redisquesAddress, buildGetQueuesCountOperation(), new Handler<AsyncResult<Message<JsonObject>>>() {
+            @Override
+            public void handle(AsyncResult<Message<JsonObject>> reply) {
+                if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
+                    JsonObject result = new JsonObject();
+                    result.put("count", reply.result().body().getLong(VALUE));
+                    jsonResponse(ctx.response(), result);
+                } else {
+                    respondWith(StatusCode.INTERNAL_SERVER_ERROR, "Error gathering count of active queues", ctx.request());
+                }
+            }
+        });
+    }
+
+    private void getQueueItemsCount(RoutingContext ctx) {
+        final String queue = lastPart(ctx.request().path(), "/");
+        eventBus.send(redisquesAddress, buildGetQueueItemsCountOperation(queue), new Handler<AsyncResult<Message<JsonObject>>>() {
+            @Override
+            public void handle(AsyncResult<Message<JsonObject>> reply) {
+                if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
+                    JsonObject result = new JsonObject();
+                    result.put("count", reply.result().body().getLong(VALUE));
+                    jsonResponse(ctx.response(), result);
+                } else {
+                    respondWith(StatusCode.INTERNAL_SERVER_ERROR, "Error gathering count of active queue items", ctx.request());
+                }
+            }
+        });
+    }
+
+    private void listOrCountQueues(RoutingContext ctx) {
+        if (ctx.request().params().contains("count")) {
+            getQueuesCount(ctx);
+        } else {
+            listQueues(ctx);
+        }
+    }
+
+    private void listQueues(RoutingContext ctx) {
         eventBus.send(redisquesAddress, buildGetQueuesOperation(), new Handler<AsyncResult<Message<JsonObject>>>() {
             @Override
             public void handle(AsyncResult<Message<JsonObject>> reply) {
@@ -190,10 +230,18 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
-    private void listQueueItems(RoutingContext ctx){
+    private void listOrCountQueueItems(RoutingContext ctx) {
+        if (ctx.request().params().contains("count")) {
+            getQueueItemsCount(ctx);
+        } else {
+            listQueueItems(ctx);
+        }
+    }
+
+    private void listQueueItems(RoutingContext ctx) {
         final String queue = lastPart(ctx.request().path(), "/");
         String limitParam = null;
-        if(ctx.request() != null && ctx.request().params().contains("limit")) {
+        if (ctx.request() != null && ctx.request().params().contains("limit")) {
             limitParam = ctx.request().params().get("limit");
         }
         eventBus.send(redisquesAddress, buildGetQueueItemsOperation(queue, limitParam), new Handler<AsyncResult<Message<JsonObject>>>() {
@@ -217,7 +265,24 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
-    private void deleteAllQueueItems(RoutingContext ctx){
+    private void addQueueItem(RoutingContext ctx) {
+        final String queue = part(ctx.request().path(), "/", 1);
+        ctx.request().bodyHandler(buffer -> {
+            try {
+                String strBuffer = encode(buffer.toString());
+                eventBus.send(redisquesAddress, buildAddQueueItemOperation(queue, strBuffer), new Handler<AsyncResult<Message<JsonObject>>>() {
+                    @Override
+                    public void handle(AsyncResult<Message<JsonObject>> reply) {
+                        checkReply(reply.result(), ctx.request(), StatusCode.BAD_REQUEST);
+                    }
+                });
+            } catch (Exception ex) {
+                respondWith(StatusCode.BAD_REQUEST, ex.getMessage(), ctx.request());
+            }
+        });
+    }
+
+    private void deleteAllQueueItems(RoutingContext ctx) {
         final String queue = lastPart(ctx.request().path(), "/");
         eventBus.send(redisquesAddress, buildDeleteAllQueueItemsOperation(queue), reply -> {
             ctx.response().end();
@@ -240,6 +305,11 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         return tokens[tokens.length - 1];
     }
 
+    private String part(String source, String separator, int pos) {
+        String[] tokens = source.split(separator);
+        return tokens[tokens.length - pos];
+    }
+
     private void jsonResponse(HttpServerResponse response, JsonObject object) {
         response.putHeader(CONTENT_TYPE, APPLICATION_JSON);
         response.end(object.encode());
@@ -247,7 +317,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
 
     private String extractUser(HttpServerRequest request) {
         String user = request.headers().get(userHeader);
-        if(user == null){
+        if (user == null) {
             user = "Unknown";
         }
         return user;
@@ -261,5 +331,51 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
             request.response().setStatusMessage(statusCode.getStatusMessage());
             request.response().end(statusCode.getStatusMessage());
         }
+    }
+
+    /**
+     * Encode the payload from a payloadString or payloadObjet.
+     *
+     * @param decoded decoded
+     * @return String
+     */
+    public String encode(String decoded) throws Exception {
+        JsonObject object = new JsonObject(decoded);
+
+        String payloadString;
+        JsonObject payloadObject = object.getJsonObject("payloadObject");
+        if (payloadObject != null) {
+            payloadString = payloadObject.encode();
+        } else {
+            payloadString = object.getString("payloadString");
+        }
+
+        if (payloadString != null) {
+            object.put(PAYLOAD, payloadString.getBytes(Charset.forName("UTF-8")));
+            object.remove("payloadString");
+            object.remove("payloadObject");
+        }
+
+        // update the content-length
+        int length = 0;
+        if (object.containsKey(PAYLOAD)) {
+            length = object.getBinary(PAYLOAD).length;
+        }
+        JsonArray newHeaders = new JsonArray();
+        for (Object headerObj : object.getJsonArray("headers")) {
+            JsonArray header = (JsonArray) headerObj;
+            String key = header.getString(0);
+            if (key.equalsIgnoreCase("content-length")) {
+                JsonArray contentLengthHeader = new JsonArray();
+                contentLengthHeader.add("Content-Length");
+                contentLengthHeader.add(Integer.toString(length));
+                newHeaders.add(contentLengthHeader);
+            } else {
+                newHeaders.add(header);
+            }
+        }
+        object.put("headers", newHeaders);
+
+        return object.toString();
     }
 }
