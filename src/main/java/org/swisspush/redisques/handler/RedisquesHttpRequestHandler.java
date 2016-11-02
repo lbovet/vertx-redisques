@@ -86,7 +86,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         /*
          * Replace single queue item
          */
-        //TODO implmement
+        router.putWithRegex(prefix + "/queues/([^/]+)/[0-9]+").handler(this::replaceSingleQueueItem);
 
         /*
          * Delete single queue item
@@ -300,6 +300,26 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
                     ctx.response().end("Not Found");
                 }
             }
+        });
+    }
+
+    private void replaceSingleQueueItem(RoutingContext ctx){
+        final String queue = part(ctx.request().path(), "/", 2);
+        checkLocked(queue, ctx.request(), aVoid -> {
+            final int index = Integer.parseInt(lastPart(ctx.request().path(), "/"));
+            ctx.request().bodyHandler(buffer -> {
+                try {
+                    String strBuffer = encode(buffer.toString());
+                    eventBus.send(redisquesAddress, buildReplaceQueueItemOperation(queue, index, strBuffer), new Handler<AsyncResult<Message<JsonObject>>>() {
+                        @Override
+                        public void handle(AsyncResult<Message<JsonObject>> reply) {
+                            checkReply(reply.result(), ctx.request(), StatusCode.NOT_FOUND);
+                        }
+                    });
+                } catch (Exception ex) {
+                    respondWith(StatusCode.BAD_REQUEST, ex.getMessage(), ctx.request());
+                }
+            });
         });
     }
 

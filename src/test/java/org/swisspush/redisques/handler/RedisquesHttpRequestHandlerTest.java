@@ -52,6 +52,30 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
             "  }\n" +
             "}";
 
+    private final String queueItemValid2 = "{\n" +
+            "  \"method\": \"PUT\",\n" +
+            "  \"uri\": \"/some/url/333/555\",\n" +
+            "  \"headers\": [\n" +
+            "    [\n" +
+            "      \"Accept\",\n" +
+            "      \"text/plain, */*; q=0.01\"\n" +
+            "    ],\n" +
+            "    [\n" +
+            "      \"Content-Type\",\n" +
+            "      \"application/json\"\n" +
+            "    ],\n" +
+            "    [\n" +
+            "      \"Accept-Charset\",\n" +
+            "      \"utf-8, iso-8859-1, utf-16, *;q=0.7\"\n" +
+            "    ]\n" +
+            "  ],\n" +
+            "  \"queueTimestamp\": 1477983671291,\n" +
+            "  \"payloadObject\": {\n" +
+            "    \"actionTime\": \"2016-11-01T08:00:02.024+01:00\",\n" +
+            "    \"type\": 2\n" +
+            "  }\n" +
+            "}";
+
     private final String queueItemInvalid = "\n" +
             "  \"method\": \"PUT\",\n" +
             "  \"uri\": \"/some/url/123/456\",\n" +
@@ -251,6 +275,120 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
                 .statusCode(200)
                 .header("content-type", "application/json")
                 .body(equalTo(new JsonObject(queueItemValid).toString()));
+
+        async.complete();
+    }
+
+    @Test
+    public void replaceSingleQueueItemOfUnlockedQueue(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        given().body(queueItemValid2).when().put("/queuing/queues/"+queueName+"/0").then().assertThat().statusCode(409).body(containsString("Queue must be locked to perform this operation"));
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        // check queue item has not been replaced
+        when().get("/queuing/queues/"+queueName+"/0").then().assertThat()
+                .statusCode(200)
+                .header("content-type", "application/json")
+                .body(equalTo(new JsonObject(queueItemValid).toString()));
+
+        // replacing with an invalid resource
+        given().body(queueItemInvalid).when().put("/queuing/queues/"+queueName+"/0").then().assertThat().statusCode(409).body(containsString("Queue must be locked to perform this operation"));
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        async.complete();
+    }
+
+    @Test
+    public void replaceSingleQueueItemWithInvalidBody(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        // lock queue
+        given().body("{}").when().put("/queuing/locks/" + queueName).then().assertThat().statusCode(200);
+
+        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        given().body(queueItemInvalid).when().put("/queuing/queues/"+queueName+"/0").then().assertThat().statusCode(400);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        // check queue item has not been replaced
+        when().get("/queuing/queues/"+queueName+"/0").then().assertThat()
+                .statusCode(200)
+                .header("content-type", "application/json")
+                .body(equalTo(new JsonObject(queueItemValid).toString()));
+
+        async.complete();
+    }
+
+    @Test
+    public void replaceSingleQueueItemWithNotExistingIndex(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        // lock queue
+        given().body("{}").when().put("/queuing/locks/" + queueName).then().assertThat().statusCode(200);
+
+        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        given().body(queueItemValid2).when().put("/queuing/queues/"+queueName+"/10").then().assertThat().statusCode(404).body(containsString("Not Found"));
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        // check queue item has not been replaced
+        when().get("/queuing/queues/"+queueName+"/0").then().assertThat()
+                .statusCode(200)
+                .header("content-type", "application/json")
+                .body(equalTo(new JsonObject(queueItemValid).toString()));
+
+        async.complete();
+    }
+
+    @Test
+    public void replaceSingleQueueItem(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        // lock queue
+        given().body("{}").when().put("/queuing/locks/" + queueName).then().assertThat().statusCode(200);
+
+        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        given().body(queueItemValid2).when().put("/queuing/queues/"+queueName+"/0").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        // check queue item has not been replaced
+        when().get("/queuing/queues/"+queueName+"/0").then().assertThat()
+                .statusCode(200)
+                .header("content-type", "application/json")
+                .body(equalTo(new JsonObject(queueItemValid2).toString()));
 
         async.complete();
     }
