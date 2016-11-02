@@ -1,5 +1,6 @@
 package org.swisspush.redisques.handler;
 
+import com.google.common.collect.Ordering;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
@@ -18,7 +19,8 @@ import org.swisspush.redisques.util.RedisquesConfiguration;
 import org.swisspush.redisques.util.StatusCode;
 
 import java.nio.charset.Charset;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.swisspush.redisques.util.RedisquesAPI.*;
 
@@ -50,18 +52,14 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         final String prefix = modConfig.getHttpRequestHandlerPrefix();
 
         /*
-         * List queuing features
+         * List endpoints
          */
-        router.get(prefix + "/").handler(ctx -> {
-            JsonObject result = new JsonObject();
-            JsonArray items = new JsonArray();
-            items.add("locks/");
-            items.add("monitoring");
-            items.add("queues/");
-            result.put(lastPart(ctx.request().path(), "/"), items);
-            ctx.response().putHeader(CONTENT_TYPE, APPLICATION_JSON);
-            ctx.response().end(result.encode());
-        });
+        router.get(prefix + "/").handler(this::listEndpoints);
+
+        /*
+         * Get monitor information
+         */
+        router.get(prefix + "/monitor/").handler(this::getMonitorInformation);
 
         /*
          * List or count queues
@@ -128,6 +126,17 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
 
     private void respondMethodNotAllowed(RoutingContext ctx) {
         respondWith(StatusCode.METHOD_NOT_ALLOWED, ctx.request());
+    }
+
+    private void listEndpoints(RoutingContext ctx) {
+        JsonObject result = new JsonObject();
+        JsonArray items = new JsonArray();
+        items.add("locks/");
+        items.add("queues/");
+        items.add("monitor/");
+        result.put(lastPart(ctx.request().path(), "/"), items);
+        ctx.response().putHeader(CONTENT_TYPE, APPLICATION_JSON);
+        ctx.response().end(result.encode());
     }
 
     private void getAllLocks(RoutingContext ctx) {
@@ -209,6 +218,33 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
                 }
             }
         });
+    }
+
+    private void getMonitorInformation(RoutingContext ctx){
+        boolean emptyQueues = ctx.request().params().contains("emptyQueues");
+        final JsonObject resultObject = new JsonObject();
+        final JsonArray queuesArray = new JsonArray();
+        eventBus.send(redisquesAddress, buildGetQueuesOperation(), new Handler<AsyncResult<Message<JsonObject>>>() {
+            @Override
+            public void handle(AsyncResult<Message<JsonObject>> reply) {
+                if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
+                    final List<String> queueNames = reply.result().body().getJsonObject(VALUE).getJsonArray("queues").getList();
+                    collectQueueLengths(queueNames, extractLimit(ctx), emptyQueues, mapEntries -> {
+                        for (Map.Entry<String, Long> entry : mapEntries) {
+                            JsonObject obj = new JsonObject();
+                            obj.put("name", entry.getKey());
+                            obj.put("size", entry.getValue());
+                            queuesArray.add(obj);
+                        }
+                        resultObject.put("queues", queuesArray);
+                        jsonResponse(ctx.response(), resultObject);
+                    });
+                } else {
+                    String error = "Error gathering names of active queues";
+                    log.error(error);
+                    respondWith(StatusCode.INTERNAL_SERVER_ERROR, error, ctx.request());
+                }
+            }});
     }
 
     private void listOrCountQueues(RoutingContext ctx) {
@@ -473,5 +509,66 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
             }
         }
         return object.toString();
+    }
+
+    private int extractLimit(RoutingContext ctx){
+        String limitParam = ctx.request().params().get("limit");
+        try{
+            return Integer.parseInt(limitParam);
+        } catch (NumberFormatException ex){
+            if(limitParam != null){
+                log.warn("Non-numeric limit parameter value used: " + limitParam);
+            }
+            return Integer.MAX_VALUE;
+        }
+    }
+
+    private void collectQueueLengths(final List<String> queueNames, final int limit, final boolean showEmptyQueues, final QueueLengthCollectingCallback callback) {
+        final SortedMap<String, Long> resultMap = new TreeMap<>();
+        final List<Map.Entry<String, Long>> mapEntryList = new ArrayList<>();
+        final AtomicInteger subCommandCount = new AtomicInteger(queueNames.size());
+        if (!queueNames.isEmpty()) {
+            for (final String name : queueNames) {
+                eventBus.send(redisquesAddress, buildGetQueueItemsCountOperation(name), new Handler<AsyncResult<Message<JsonObject>>>() {
+                    @Override
+                    public void handle(AsyncResult<Message<JsonObject>> reply) {
+                        subCommandCount.decrementAndGet();
+                        if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
+                            final long count = reply.result().body().getLong(VALUE);
+                            if (showEmptyQueues || count > 0) {
+                                resultMap.put(name, count);
+                            }
+                        } else {
+                            log.error("Error gathering size of queue " + name);
+                        }
+
+                        if (subCommandCount.get() == 0) {
+                            mapEntryList.addAll(resultMap.entrySet());
+                            sortResultMap(mapEntryList);
+                            int toIndex = limit > queueNames.size() ? queueNames.size() : limit;
+                            toIndex = Math.min(mapEntryList.size(), toIndex);
+                            callback.onDone(mapEntryList.subList(0, toIndex));
+                        }
+                    }
+                });
+            }
+        } else {
+            callback.onDone(mapEntryList);
+        }
+    }
+
+    private interface QueueLengthCollectingCallback {
+        void onDone(List<Map.Entry<String, Long>> mapEntries);
+    }
+
+    private void sortResultMap(List<Map.Entry<String, Long>> input) {
+        Ordering<Map.Entry<String, Long>> byMapValues = new Ordering<Map.Entry<String, Long>>() {
+            @Override
+            public int compare(Map.Entry<String, Long> left, Map.Entry<String, Long> right) {
+                return left.getValue().compareTo(right.getValue());
+            }
+        };
+
+        Collections.sort(input, byMapValues.reverse());
     }
 }

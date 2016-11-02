@@ -741,4 +741,121 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
             async.complete();
         });
     }
+
+    @Test
+    public void getMonitorInformation(TestContext context) {
+        Async async = context.async();
+        flushAll();
+
+        when().get("/queuing/monitor").then().assertThat().statusCode(200)
+                .body("queues", empty());
+
+        // prepare
+        eventBusSend(buildEnqueueOperation("queue_1", "item1_1"), null);
+        eventBusSend(buildEnqueueOperation("queue_1", "item1_2"), null);
+        eventBusSend(buildEnqueueOperation("queue_1", "item1_3"), null);
+
+        eventBusSend(buildEnqueueOperation("queue_2", "item2_1"), null);
+        eventBusSend(buildEnqueueOperation("queue_2", "item2_2"), null);
+
+        eventBusSend(buildEnqueueOperation("queue_3", "item3_1"), null);
+
+        // lock queue
+        given().body("{}").when().put("/queuing/locks/queue_3").then().assertThat().statusCode(200);
+        when().delete("/queuing/queues/queue_3/0").then().assertThat().statusCode(200);
+
+        String expectedNoEmptyQueuesNoLimit = "{\n" +
+                "  \"queues\": [\n" +
+                "    {\n" +
+                "      \"name\": \"queue_1\",\n" +
+                "      \"size\": 3\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"queue_2\",\n" +
+                "      \"size\": 2\n" +
+                "    }\n" +
+                "  ]\n" +
+                "}";
+
+        when().get("/queuing/monitor").then().assertThat().statusCode(200)
+                .body(equalTo(new JsonObject(expectedNoEmptyQueuesNoLimit).toString()));
+
+        String expectedWithEmptyQueuesNoLimit = "{\n" +
+                "  \"queues\": [\n" +
+                "    {\n" +
+                "      \"name\": \"queue_1\",\n" +
+                "      \"size\": 3\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"queue_2\",\n" +
+                "      \"size\": 2\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"queue_3\",\n" +
+                "      \"size\": 0\n" +
+                "    }\n" +
+                "  ]\n" +
+                "}";
+
+        when().get("/queuing/monitor?emptyQueues").then().assertThat().statusCode(200)
+                .body(equalTo(new JsonObject(expectedWithEmptyQueuesNoLimit).toString()));
+
+        String expectedNoEmptyQueuesAndLimit3 = "{\n" +
+                "  \"queues\": [\n" +
+                "    {\n" +
+                "      \"name\": \"queue_1\",\n" +
+                "      \"size\": 3\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"queue_2\",\n" +
+                "      \"size\": 2\n" +
+                "    }\n" +
+                "  ]\n" +
+                "}";
+
+        when().get("/queuing/monitor?limit=3").then().assertThat().statusCode(200)
+                .body(equalTo(new JsonObject(expectedNoEmptyQueuesAndLimit3).toString()));
+
+        String expectedWithEmptyQueuesAndLimit3 = "{\n" +
+                "  \"queues\": [\n" +
+                "    {\n" +
+                "      \"name\": \"queue_1\",\n" +
+                "      \"size\": 3\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"queue_2\",\n" +
+                "      \"size\": 2\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"queue_3\",\n" +
+                "      \"size\": 0\n" +
+                "    }\n" +
+                "  ]\n" +
+                "}";
+
+        when().get("/queuing/monitor?limit=3&emptyQueues").then().assertThat().statusCode(200)
+                .body(equalTo(new JsonObject(expectedWithEmptyQueuesAndLimit3).toString()));
+
+        String expectedWithEmptyQueuesAndInvalidLimit = "{\n" +
+                "  \"queues\": [\n" +
+                "    {\n" +
+                "      \"name\": \"queue_1\",\n" +
+                "      \"size\": 3\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"queue_2\",\n" +
+                "      \"size\": 2\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"queue_3\",\n" +
+                "      \"size\": 0\n" +
+                "    }\n" +
+                "  ]\n" +
+                "}";
+
+        when().get("/queuing/monitor?limit=xx99xx&emptyQueues").then().assertThat().statusCode(200)
+                .body(equalTo(new JsonObject(expectedWithEmptyQueuesAndInvalidLimit).toString()));
+
+        async.complete();
+    }
 }

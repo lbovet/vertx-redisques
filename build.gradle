@@ -49,6 +49,7 @@ dependencies {
     compile "io.vertx:vertx-web:$vertxVersion"
     compile "org.springframework:spring-core:4.1.6.RELEASE"
     compile "commons-codec:commons-codec:$commonscodecVersion"
+    compile "com.google.guava:guava:$guavaVersion"
 
     runtime "commons-codec:commons-codec:$commonscodecVersion"
 
