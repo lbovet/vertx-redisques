@@ -89,7 +89,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         /*
          * Delete single queue item
          */
-        //TODO implmement
+        router.deleteWithRegex(prefix + "/queues/([^/]+)/[0-9]+").handler(this::deleteQueueItem);
 
         /*
          * Add queue item
@@ -282,6 +282,17 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
+    private void deleteQueueItem(RoutingContext ctx) {
+        final String queue = part(ctx.request().path(), "/", 2);
+        final int index = Integer.parseInt(lastPart(ctx.request().path(), "/"));
+        checkLocked(queue, ctx.request(), aVoid -> eventBus.send(redisquesAddress, buildDeleteQueueItemOperation(queue, index), new Handler<AsyncResult<Message<JsonObject>>>() {
+            @Override
+            public void handle(AsyncResult<Message<JsonObject>> reply) {
+                checkReply(reply.result(), ctx.request(), StatusCode.NOT_FOUND);
+            }
+        }));
+    }
+
     private void deleteAllQueueItems(RoutingContext ctx) {
         final String queue = lastPart(ctx.request().path(), "/");
         eventBus.send(redisquesAddress, buildDeleteAllQueueItemsOperation(queue), reply -> {
@@ -321,6 +332,24 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
             user = "Unknown";
         }
         return user;
+    }
+
+    private void checkLocked(String queue, final HttpServerRequest request, final Handler<Void> handler) {
+        request.pause();
+        eventBus.send(redisquesAddress, buildGetLockOperation(queue), new Handler<AsyncResult<Message<JsonObject>>>() {
+            @Override
+            public void handle(AsyncResult<Message<JsonObject>> reply) {
+                if (NO_SUCH_LOCK.equals(reply.result().body().getString(STATUS))) {
+                    request.resume();
+                    request.response().setStatusCode(StatusCode.CONFLICT.getStatusCode());
+                    request.response().setStatusMessage("Queue must be locked to perform this operation");
+                    request.response().end("Queue must be locked to perform this operation");
+                } else {
+                    handler.handle(null);
+                    request.resume();
+                }
+            }
+        });
     }
 
     private void checkReply(Message<JsonObject> reply, HttpServerRequest request, StatusCode statusCode) {

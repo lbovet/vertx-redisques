@@ -28,6 +28,54 @@ import static org.swisspush.redisques.util.RedisquesAPI.buildPutLockOperation;
  */
 public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
 
+    private final String queueItemValid = "{\n" +
+            "  \"method\": \"PUT\",\n" +
+            "  \"uri\": \"/some/url/123/456\",\n" +
+            "  \"headers\": [\n" +
+            "    [\n" +
+            "      \"Accept\",\n" +
+            "      \"text/plain, */*; q=0.01\"\n" +
+            "    ],\n" +
+            "    [\n" +
+            "      \"Content-Type\",\n" +
+            "      \"application/json\"\n" +
+            "    ],\n" +
+            "    [\n" +
+            "      \"Accept-Charset\",\n" +
+            "      \"utf-8, iso-8859-1, utf-16, *;q=0.7\"\n" +
+            "    ]\n" +
+            "  ],\n" +
+            "  \"queueTimestamp\": 1477983671291,\n" +
+            "  \"payloadObject\": {\n" +
+            "    \"actionTime\": \"2016-11-01T08:00:02.024+01:00\",\n" +
+            "    \"type\": 2\n" +
+            "  }\n" +
+            "}";
+
+    private final String queueItemInvalid = "\n" +
+            "  \"method\": \"PUT\",\n" +
+            "  \"uri\": \"/some/url/123/456\",\n" +
+            "  \"headers\": [\n" +
+            "    [\n" +
+            "      \"Accept\",\n" +
+            "      \"text/plain, */*; q=0.01\"\n" +
+            "    ],\n" +
+            "    [\n" +
+            "      \"Content-Type\",\n" +
+            "      \"application/json\"\n" +
+            "    ],\n" +
+            "    [\n" +
+            "      \"Accept-Charset\",\n" +
+            "      \"utf-8, iso-8859-1, utf-16, *;q=0.7\"\n" +
+            "    ]\n" +
+            "  ],\n" +
+            "  \"queueTimestamp\": 1477983671291,\n" +
+            "  \"payloadObject\": {\n" +
+            "    \"actionTime\": \"2016-11-01T08:00:02.024+01:00\",\n" +
+            "    \"type\": 2\n" +
+            "  }\n" +
+            "}";
+
     @Rule
     public Timeout rule = Timeout.seconds(15);
 
@@ -130,35 +178,11 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, QUEUES_PREFIX, 0);
         assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
 
-        String queueItem = "{\n" +
-                "  \"method\": \"PUT\",\n" +
-                "  \"uri\": \"/some/url/123/456\",\n" +
-                "  \"headers\": [\n" +
-                "    [\n" +
-                "      \"Accept\",\n" +
-                "      \"text/plain, */*; q=0.01\"\n" +
-                "    ],\n" +
-                "    [\n" +
-                "      \"Content-Type\",\n" +
-                "      \"application/json\"\n" +
-                "    ],\n" +
-                "    [\n" +
-                "      \"Accept-Charset\",\n" +
-                "      \"utf-8, iso-8859-1, utf-16, *;q=0.7\"\n" +
-                "    ]\n" +
-                "  ],\n" +
-                "  \"queueTimestamp\": 1477983671291,\n" +
-                "  \"payloadObject\": {\n" +
-                "    \"actionTime\": \"2016-11-01T08:00:02.024+01:00\",\n" +
-                "    \"type\": 2\n" +
-                "  }\n" +
-                "}";
-
-        given().body(queueItem).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
         assertKeyCount(context, QUEUES_PREFIX, 1);
         context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
 
-        given().body(queueItem).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
         assertKeyCount(context, QUEUES_PREFIX, 1);
         context.assertEquals(2L, jedis.llen(QUEUES_PREFIX + queueName));
 
@@ -173,33 +197,99 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, QUEUES_PREFIX, 0);
         assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
 
-        String queueItem = "\n" +
-                "  \"method\": \"PUT\",\n" +
-                "  \"uri\": \"/some/url/123/456\",\n" +
-                "  \"headers\": [\n" +
-                "    [\n" +
-                "      \"Accept\",\n" +
-                "      \"text/plain, */*; q=0.01\"\n" +
-                "    ],\n" +
-                "    [\n" +
-                "      \"Content-Type\",\n" +
-                "      \"application/json\"\n" +
-                "    ],\n" +
-                "    [\n" +
-                "      \"Accept-Charset\",\n" +
-                "      \"utf-8, iso-8859-1, utf-16, *;q=0.7\"\n" +
-                "    ]\n" +
-                "  ],\n" +
-                "  \"queueTimestamp\": 1477983671291,\n" +
-                "  \"payloadObject\": {\n" +
-                "    \"actionTime\": \"2016-11-01T08:00:02.024+01:00\",\n" +
-                "    \"type\": 2\n" +
-                "  }\n" +
-                "}";
-
-        given().body(queueItem).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(400);
+        given().body(queueItemInvalid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(400);
         assertKeyCount(context, QUEUES_PREFIX, 0);
         context.assertEquals(0L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        async.complete();
+    }
+
+    @Test
+    public void deleteQueueItemWithNonNumericIndex(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        // try to delete with non-numeric index
+        String nonnumericIndex = "xx";
+        when().delete("/queuing/queues/"+queueName+"/"+nonnumericIndex).then().assertThat().statusCode(405);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        async.complete();
+    }
+
+    @Test
+    public void deleteQueueItemOfUnlockedQueue(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        String numericIndex = "22";
+        when().delete("/queuing/queues/"+queueName+"/"+numericIndex).then().assertThat().statusCode(409).body(containsString("Queue must be locked to perform this operation"));
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        async.complete();
+    }
+
+    @Test
+    public void deleteQueueItemNonExistingIndex(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        // lock queue
+        given().body("{}").when().put("/queuing/locks/" + queueName).then().assertThat().statusCode(200);
+
+        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        String numericIndex = "22";
+        when().delete("/queuing/queues/"+queueName+"/"+numericIndex).then().assertThat().statusCode(404).body(containsString("Not Found"));
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        async.complete();
+    }
+
+    @Test
+    public void deleteQueueItem(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        assertKeyCount(context, QUEUES_PREFIX + queueName, 0);
+
+        // lock queue
+        given().body("{}").when().put("/queuing/locks/" + queueName).then().assertThat().statusCode(200);
+
+        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 1);
+        context.assertEquals(1L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        String numericIndex = "0";
+        when().delete("/queuing/queues/"+queueName+"/"+numericIndex).then().assertThat().statusCode(200);
+        assertKeyCount(context, QUEUES_PREFIX, 0);
+        context.assertEquals(0L, jedis.llen(QUEUES_PREFIX + queueName));
+
+        // try to delete again
+        when().delete("/queuing/queues/"+queueName+"/"+numericIndex).then().assertThat().statusCode(404).body(containsString("Not Found"));
 
         async.complete();
     }
