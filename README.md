@@ -36,6 +36,10 @@ The following configuration values are available:
 | redisPort | 6379 | The port where redis is running on |
 | redisEncoding | UTF-8 | The encoding to use in redis |
 | checkInterval | 60 | The interval [s] to check timestamps of not-active / empty queues by executing **check** queue operation. _checkInterval_ value must be greater 0, otherwise the default is used. |
+| httpRequestHandlerEnabled | false | Enable / disable the HTTP API |
+| httpRequestHandlerPrefix | /queuing | The url prefix for all HTTP API endpoints |
+| httpRequestHandlerPort | 7070 | The port of the HTTP API |
+| httpRequestHandlerUserHeader | x-rp-usr | The name of the header property where the user information is provided. Used for the HTTP API  |
 
 ### Configuration util
 
@@ -405,6 +409,181 @@ Response Data
     "status": "ok" / "error"
 }
 ```
+
+## RedisQues HTTP API
+RedisQues provides a HTTP API to modify queues, queue items and get information about queue counts and queue item counts.
+
+### Configuration
+To enable the HTTP API, the _httpRequestHandlerEnabled_ configuration property has to be set to _TRUE_.
+
+For additional configuration options relating the HTTP API, see the [Configuration](#configuration) section.
+
+### API Endpoints
+The following request examples will use a configured prefix of _/queuing_
+
+### List endpoints
+To list the available endpoints use
+> GET /queuing
+
+The result will be a json object with the available endpoints like the example below
+
+```json
+{
+  "queuing": [
+    "locks/",
+    "queues/",
+    "monitor/"
+  ]
+}
+```
+
+### Get monitor information
+The monitor information contains the active queues and their queue items count. To get the monitor information use
+> GET /queuing/monitor
+
+Available url parameters are:
+* _limit_: The maximum amount of queues to list
+* _emptyQueues_: Also show empty queues
+
+The result will be a json object with the monitor information like the example below
+
+```json
+{
+  "queues": [
+    {
+      "name": "queue_1",
+      "size": 3
+    },
+    {
+      "name": "queue_2",
+      "size": 2
+    }
+  ]
+}
+```
+
+### List or count queues
+To list the active queues use
+> GET /queuing/queues
+
+The result will be a json object with a list of active queues like the example below
+
+```json
+{
+  "queues": [
+    "queue_1",
+    "queue_2",
+    "queue_3"
+  ]
+}
+```
+
+To get the count of active queues only, use
+> GET /queuing/queues?count
+
+The result will be a json object with the count of active queues like the example below
+
+```json
+{
+  "count": 3
+}
+```
+
+### List or count queue items
+To list the queue items of a single queue use
+> GET /queuing/queues/myQueue
+
+Add the _limit_ url parameter to define the maximum amount of queue items to retrieve
+
+The result will be a json object with a list of queue items like the example below
+
+```json
+{
+  "myQueue": [
+    "queueItem1",
+    "queueItem2",
+    "queueItem3",
+    "queueItem4"
+  ]
+}
+```
+
+To get the count of queue items only, use
+> GET /queuing/queues/myQueue?count
+
+The result will be a json object with the count of queue items like the example below
+
+```json
+{
+  "count": 4
+}
+```
+
+### Delete all queue items
+To delete all queue items of a single queue use
+> DELETE /queuing/queues/myQueue
+
+### Get single queue item
+To get a single queue item use
+> GET /queuing/queues/myQueue/0
+
+The result will be a json object representing the queue item at the given index (0 in the example above). When no queue item at the given index exists, a statusCode 404 with the error message _'Not Found'_ will be returned.
+
+### Replace single queue item
+To replace a single queue item use
+> PUT /queuing/queues/myQueue/0
+
+having the payload in the request body. The queue must be locked to perform this operation, otherwise a statusCode 409 with the error message _'Queue must be locked to perform this operation'_ will be returned. When no queue item at the given index exists, a statusCode 404 with the error message _'Not Found'_ will be returned.
+
+### Delete single queue item
+To delete a single queue item use
+> DELETE /queuing/queues/myQueue/0
+
+The queue must be locked to perform this operation, otherwise a statusCode 409 with the error message _'Queue must be locked to perform this operation'_ will be returned. When no queue item at the given index exists, a statusCode 404 with the error message _'Not Found'_ will be returned.
+
+### Add queue item
+To add a queue item (to the end of the queue) use
+> POST /queuing/queues/myQueue/
+
+having the payload in the request body. When the request body is not a valid json object, a statusCode 400 with the error message _'Bad Request'_ will be returned.
+
+### Get all locks
+To list all existing locks use
+> GET /queuing/locks/
+
+The result will be a json object with a list of all locks like the example below
+
+```json
+{
+  "locks": [
+    "queue1",
+    "queue2"
+  ]
+}
+```
+
+### Add lock
+To add a lock use
+> PUT /queuing/locks/myQueue
+
+having an empty json object {} in the body. The configured _httpRequestHandlerUserHeader_ property will be used to define the user which requested the lock. If no header is provided, "Unknown" will be used instead.
+
+### Get single lock
+To get a single lock use
+> GET /queuing/locks/queue1
+
+The result will be a json object with the lock information like the example below
+
+```json
+{
+  "requestedBy": "someuser",
+  "timestamp": 1478100330698
+}
+```
+
+### Delete single lock
+To delete a single lock use
+> DELETE /queuing/locks/queue1
 
 ## Dependencies
 
