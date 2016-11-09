@@ -6,6 +6,7 @@ import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
+import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.DecodeException;
@@ -43,7 +44,27 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
     private final String redisquesAddress;
     private final String userHeader;
 
-    public RedisquesHttpRequestHandler(Vertx vertx, RedisquesConfiguration modConfig) {
+    public static void init(Vertx vertx, RedisquesConfiguration modConfig){
+        log.info("Enable http request handler: " + modConfig.getHttpRequestHandlerEnabled());
+        if(modConfig.getHttpRequestHandlerEnabled()){
+            if(modConfig.getHttpRequestHandlerPort() != null && modConfig.getHttpRequestHandlerUserHeader() != null){
+                RedisquesHttpRequestHandler handler = new RedisquesHttpRequestHandler(vertx, modConfig);
+                // in Vert.x 2x 100-continues was activated per default, in vert.x 3x it is off per default.
+                HttpServerOptions options = new HttpServerOptions().setHandle100ContinueAutomatically(true);
+                vertx.createHttpServer(options).requestHandler(handler).listen(modConfig.getHttpRequestHandlerPort(), result -> {
+                    if(result.succeeded()){
+                        log.info("Successfully started http request handler on port " + modConfig.getHttpRequestHandlerPort());
+                    } else {
+                        log.error("Unable to start http request handler. Message: " + result.cause().getMessage());
+                    }
+                });
+            } else {
+                log.error("Configured to enable http request handler but no port configuration and/or user header configuration provided");
+            }
+        }
+    }
+
+    private RedisquesHttpRequestHandler(Vertx vertx, RedisquesConfiguration modConfig) {
         this.router = Router.router(vertx);
         this.eventBus = vertx.eventBus();
         this.redisquesAddress = modConfig.getAddress();

@@ -132,7 +132,7 @@ public class RedisQues extends AbstractVerticle {
 
         this.luaScriptManager = new LuaScriptManager(redisClient);
 
-        registerHttpRequestHandler(modConfig);
+        RedisquesHttpRequestHandler.init(vertx, modConfig);
 
         // Handles operations
         eb.localConsumer(address, new Handler<Message<JsonObject>>() {
@@ -294,26 +294,6 @@ public class RedisQues extends AbstractVerticle {
         });
 
         registerQueueCheck(modConfig);
-    }
-
-    private void registerHttpRequestHandler(RedisquesConfiguration modConfig){
-        log.info("Enable http request handler: " + modConfig.getHttpRequestHandlerEnabled());
-        if(modConfig.getHttpRequestHandlerEnabled()){
-            if(modConfig.getHttpRequestHandlerPort() != null && modConfig.getHttpRequestHandlerUserHeader() != null){
-                RedisquesHttpRequestHandler handler = new RedisquesHttpRequestHandler(vertx, modConfig);
-                // in Vert.x 2x 100-continues was activated per default, in vert.x 3x it is off per default.
-                HttpServerOptions options = new HttpServerOptions().setHandle100ContinueAutomatically(true);
-                vertx.createHttpServer(options).requestHandler(handler).listen(modConfig.getHttpRequestHandlerPort(), result -> {
-                    if(result.succeeded()){
-                        log.info("Successfully started http request handler on port " + modConfig.getHttpRequestHandlerPort());
-                    } else {
-                        log.error("Unable to start http request handler. Message: " + result.cause().getMessage());
-                    }
-                });
-            } else {
-                log.error("Configured to enable http request handler but no port configuration and/or user header configuration provided");
-            }
-        }
     }
 
     private void registerQueueCheck(RedisquesConfiguration modConfig) {
