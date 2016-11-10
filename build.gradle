@@ -46,17 +46,20 @@ dependencies {
 
     compile "io.vertx:vertx-core:$vertxVersion"
     compile "io.vertx:vertx-redis-client:$vertxVersion"
+    compile "io.vertx:vertx-web:$vertxVersion"
     compile "org.springframework:spring-core:4.1.6.RELEASE"
     compile "commons-codec:commons-codec:$commonscodecVersion"
+    compile "com.google.guava:guava:$guavaVersion"
 
     runtime "commons-codec:commons-codec:$commonscodecVersion"
 
     testCompile "junit:junit:$junitVersion"
     testCompile "io.vertx:vertx-unit:$vertxVersion"
-    testCompile 'com.github.kstyrc:embedded-redis:0.6'
-    testCompile 'com.jayway.restassured:rest-assured:2.4.1'
-    testCompile 'com.jayway.awaitility:awaitility-scala:1.6.3'
-    testCompile 'redis.clients:jedis:2.4.1'
+    testCompile "com.github.kstyrc:embedded-redis:$embeddedRedisVersion"
+    testCompile "com.jayway.restassured:rest-assured:$restAssuredVersion"
+    testCompile "com.jayway.awaitility:awaitility:$awaitilityVersion"
+    testCompile "org.hamcrest:hamcrest-library:$hamcrestVersion"
+    testCompile "redis.clients:jedis:$jedisVersion"
 
     testRuntime 'com.github.kstyrc:embedded-redis:0.6'
 }

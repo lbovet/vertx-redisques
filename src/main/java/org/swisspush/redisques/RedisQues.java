@@ -7,6 +7,7 @@ import io.vertx.core.Handler;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.eventbus.MessageConsumer;
+import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
@@ -130,6 +131,8 @@ public class RedisQues extends AbstractVerticle {
                 .setEncoding(modConfig.getRedisEncoding()));
 
         this.luaScriptManager = new LuaScriptManager(redisClient);
+
+        RedisquesHttpRequestHandler.init(vertx, modConfig);
 
         // Handles operations
         eb.localConsumer(address, new Handler<Message<JsonObject>>() {

@@ -12,9 +12,7 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.Timeout;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.swisspush.redisques.util.RedisquesConfiguration;
 import redis.clients.jedis.Jedis;
 
@@ -42,13 +40,18 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
     @Rule
     public Timeout rule = Timeout.seconds(300);
 
-    @BeforeClass
-    public static void createQueueProcessor(TestContext context) {
+    @Before
+    public void createQueueProcessor(TestContext context) {
         deployRedisques(context);
         queueProcessor = vertx.eventBus().consumer("processor-address");
     }
 
-    protected static void deployRedisques(TestContext context) {
+    @After
+    public void tearDown(TestContext context) {
+        vertx.close(context.asyncAssertSuccess());
+    }
+
+    protected void deployRedisques(TestContext context) {
         vertx = Vertx.vertx();
         JsonObject config = RedisquesConfiguration.with()
                 .processorAddress("processor-address")
