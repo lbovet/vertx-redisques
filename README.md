@@ -477,6 +477,7 @@ The result will be a json object with a list of active queues like the example b
   ]
 }
 ```
+**Attention:** The result will also contain empty queues when requested before the internal cleanup has passed. Use the monitor endpoint when non-empty queues should be listed only.
 
 To get the count of active queues only, use
 > GET /queuing/queues?count
@@ -488,6 +489,7 @@ The result will be a json object with the count of active queues like the exampl
   "count": 3
 }
 ```
+**Attention:** The count will also contain empty queues when requested before the internal cleanup has passed. Use the monitor endpoint when non-empty queues should be counted only.
 
 ### List or count queue items
 To list the queue items of a single queue use
