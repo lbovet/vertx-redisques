@@ -83,6 +83,11 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         router.get(prefix + "/monitor/").handler(this::getMonitorInformation);
 
         /*
+         * List queue items
+         */
+        router.getWithRegex(prefix + "/monitor/[^/]+").handler(this::listQueueItems);
+
+        /*
          * List or count queues
          */
         router.get(prefix + "/queues/").handler(this::listOrCountQueues);
