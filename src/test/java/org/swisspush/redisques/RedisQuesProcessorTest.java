@@ -37,6 +37,17 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
 
     private static MessageConsumer<JsonObject> queueProcessor = null;
 
+    private static final String CUSTOM_REDIS_KEY_PREFIX = "mycustomredisprefix:";
+    private static final String CUSTOM_REDISQUES_ADDRESS = "customredisques";
+
+    @Override
+    protected String getRedisPrefix() {
+        return CUSTOM_REDIS_KEY_PREFIX;
+    }
+
+    @Override
+    protected String getRedisquesAddress() { return CUSTOM_REDISQUES_ADDRESS; }
+
     @Rule
     public Timeout rule = Timeout.seconds(300);
 
@@ -54,6 +65,8 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
     protected void deployRedisques(TestContext context) {
         vertx = Vertx.vertx();
         JsonObject config = RedisquesConfiguration.with()
+                .address(getRedisquesAddress())
+                .redisPrefix(CUSTOM_REDIS_KEY_PREFIX)
                 .processorAddress("processor-address")
                 .redisEncoding("ISO-8859-1")
                 .refreshPeriod(2)
@@ -162,7 +175,7 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
                 }
                 signature.update(message.getBytes());
                 log.info("send message ["+digestStr(signature)+"] for queue ["+queue+"] ");
-                vertx.eventBus().send("redisques", buildEnqueueOperation(queue, message), new Handler<AsyncResult<Message<JsonObject>>>() {
+                vertx.eventBus().send(getRedisquesAddress(), buildEnqueueOperation(queue, message), new Handler<AsyncResult<Message<JsonObject>>>() {
                     @Override
                     public void handle(AsyncResult<Message<JsonObject>> event) {
                         if(event.result().body().getString(STATUS).equals(OK)) {
@@ -175,7 +188,7 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
                 });
                 messageCount++;
             } else {
-                vertx.eventBus().send("redisques", buildEnqueueOperation(queue, "STOP"), new Handler<AsyncResult<Message<JsonObject>>>() {
+                vertx.eventBus().send(getRedisquesAddress(), buildEnqueueOperation(queue, "STOP"), new Handler<AsyncResult<Message<JsonObject>>>() {
                     @Override
                     public void handle(AsyncResult<Message<JsonObject>> reply) {
                         context.assertEquals(OK, reply.result().body().getString(STATUS));
@@ -195,10 +208,10 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
             context.assertEquals("hello", message.body().getString("payload"));
 
             // assert the value is still in the redis store
-            String queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+            String queueValueInRedis = jedis.lindex(getQueuesRedisKeyPrefix() + "check-queue", 0);
             context.assertEquals("hello", queueValueInRedis);
             // assert that there is a consumer assigned
-            String consumer = jedis.get("redisques:consumers:check-queue");
+            String consumer = jedis.get(getConsumersRedisKeyPrefix() + "check-queue");
             context.assertNotNull(consumer);
 
             // reply to redisques with OK, which will delete the queue entry and release the consumer
@@ -206,7 +219,7 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
             sleep(500);
 
             // assert that the queue is empty now
-            queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+            queueValueInRedis = jedis.lindex(getQueuesRedisKeyPrefix() + "check-queue", 0);
             context.assertNull(queueValueInRedis);
 
             // end the test
@@ -237,10 +250,10 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
             context.assertEquals("hello", message.body().getString("payload"));
 
             // assert the value is still in the redis store
-            String queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+            String queueValueInRedis = jedis.lindex(getQueuesRedisKeyPrefix() + "check-queue", 0);
             context.assertEquals("hello", queueValueInRedis);
             // assert that there is a consumer assigned
-            String consumer = jedis.get("redisques:consumers:check-queue");
+            String consumer = jedis.get(getConsumersRedisKeyPrefix() + "check-queue");
             context.assertNotNull(consumer);
 
 
@@ -252,14 +265,14 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
                 sleep(500);
 
                 // assert that value is still in the queue
-                queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+                queueValueInRedis = jedis.lindex(getQueuesRedisKeyPrefix() + "check-queue", 0);
                 context.assertEquals("hello", queueValueInRedis);
             } else {
                 message.reply(new JsonObject().put(STATUS, OK));
                 sleep(500);
 
                 // assert that the queue is empty now
-                queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+                queueValueInRedis = jedis.lindex(getQueuesRedisKeyPrefix() + "check-queue", 0);
                 context.assertNull(queueValueInRedis);
 
                 // end the test
@@ -289,23 +302,23 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
             context.assertEquals("hello", message.body().getString("payload"));
 
             // assert the value is still in the redis store
-            String queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+            String queueValueInRedis = jedis.lindex(getQueuesRedisKeyPrefix() + "check-queue", 0);
             context.assertEquals("hello", queueValueInRedis);
             // assert that there is a consumer assigned
-            String consumer = jedis.get("redisques:consumers:check-queue");
+            String consumer = jedis.get(getConsumersRedisKeyPrefix() + "check-queue");
             context.assertNotNull(consumer);
 
 
             if (queueProcessCount == 1) {
                 // assert that value is still in the queue
-                queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+                queueValueInRedis = jedis.lindex(getQueuesRedisKeyPrefix() + "check-queue", 0);
                 context.assertEquals("hello", queueValueInRedis);
             } else {
                 message.reply(new JsonObject().put(STATUS, OK));
                 sleep(500);
 
                 // assert that the queue is empty now
-                queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+                queueValueInRedis = jedis.lindex(getQueuesRedisKeyPrefix() + "check-queue", 0);
                 context.assertNull(queueValueInRedis);
 
                 // end the test

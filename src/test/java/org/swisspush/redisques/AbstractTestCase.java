@@ -23,9 +23,7 @@ import static org.swisspush.redisques.util.RedisquesAPI.REQUESTED_BY;
 @RunWith(VertxUnitRunner.class)
 public abstract class AbstractTestCase {
 
-    protected static final String QUEUES_PREFIX = "redisques:queues:";
     protected static final String TIMESTAMP = "timestamp";
-    protected static final String REDISQUES_LOCKS = "redisques:locks";
     protected static final String PROCESSOR_ADDRESS = "processor-address";
 
     protected static Logger log = LoggerFactory.getLogger(AbstractTestCase.class);
@@ -41,6 +39,18 @@ public abstract class AbstractTestCase {
         }
     }
 
+    protected String getRedisquesAddress() {return "redisques"; }
+
+    protected String getRedisPrefix() {return "redisques:"; }
+
+    protected String getLocksRedisKey(){
+        return getRedisPrefix() + "locks";
+    }
+
+    protected String getQueuesRedisKeyPrefix(){ return getRedisPrefix() + "queues:"; }
+
+    protected String getConsumersRedisKeyPrefix(){ return  getRedisPrefix() + "consumers:"; }
+
     protected void assertKeyCount(TestContext context, int keyCount){
         assertKeyCount(context, "", keyCount);
     }
@@ -50,7 +60,7 @@ public abstract class AbstractTestCase {
     }
 
     protected void assertLockContent(TestContext context, String queuename, String expectedRequestedByValue){
-        String item = jedis.hget(REDISQUES_LOCKS, queuename);
+        String item = jedis.hget(getLocksRedisKey(), queuename);
         context.assertNotNull(item);
         if(item != null){
             JsonObject lockInfo = new JsonObject(item);
@@ -81,7 +91,7 @@ public abstract class AbstractTestCase {
     }
 
     protected void eventBusSend(JsonObject operation, Handler<AsyncResult<Message<JsonObject>>> handler){
-        vertx.eventBus().send("redisques", operation, handler);
+        vertx.eventBus().send(getRedisquesAddress(), operation, handler);
     }
 
     protected void lockQueue(String queue){
@@ -89,6 +99,6 @@ public abstract class AbstractTestCase {
         lockInfo.put(REQUESTED_BY, "unit_test");
         lockInfo.put("timestamp", System.currentTimeMillis());
         Map<String,String> values = ImmutableMap.of(queue, lockInfo.encode());
-        jedis.hmset("redisques:locks", values);
+        jedis.hmset(getLocksRedisKey(), values);
     }
 }

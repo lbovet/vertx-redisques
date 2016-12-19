@@ -23,6 +23,13 @@ public class RedisQuesProcessorRedeployTest extends AbstractTestCase {
     @Rule
     public Timeout rule = Timeout.seconds(20);
 
+    private static final String CUSTOM_REDIS_KEY_PREFIX = "mycustomredisprefix:";
+
+    @Override
+    protected String getRedisPrefix() {
+        return CUSTOM_REDIS_KEY_PREFIX;
+    }
+
     @BeforeClass
     public static void deployRedisques(TestContext context) {
         deployRedisques(context, 2);
@@ -31,6 +38,7 @@ public class RedisQuesProcessorRedeployTest extends AbstractTestCase {
     protected static void deployRedisques(TestContext context, int refreshPeriod) {
         vertx = Vertx.vertx();
         JsonObject config = RedisquesConfiguration.with()
+                .redisPrefix(CUSTOM_REDIS_KEY_PREFIX)
                 .processorAddress("processor-address")
                 .redisEncoding("ISO-8859-1")
                 .refreshPeriod(refreshPeriod)
@@ -71,11 +79,11 @@ public class RedisQuesProcessorRedeployTest extends AbstractTestCase {
             message.reply(new JsonObject().put(STATUS, ERROR));
 
             // assert that there is a consumer assigned
-            String consumer = jedis.get("redisques:consumers:check-queue");
+            String consumer = jedis.get(getConsumersRedisKeyPrefix() + "check-queue");
             context.assertNotNull(consumer);
 
             // assert that value is still in the queue
-            String queueValueInRedis = jedis.lindex("redisques:queues:check-queue", 0);
+            String queueValueInRedis = jedis.lindex(getQueuesRedisKeyPrefix() + "check-queue", 0);
             context.assertEquals("hello", queueValueInRedis);
 
             // undeploy redisques to simulate a server restart
@@ -98,7 +106,7 @@ public class RedisQuesProcessorRedeployTest extends AbstractTestCase {
                 });
 
                 // assert that the consumer is null
-                String consumerAfterRedeploy = jedis.get("redisques:consumers:check-queue");
+                String consumerAfterRedeploy = jedis.get(getConsumersRedisKeyPrefix() + "check-queue");
                 context.assertNull(consumerAfterRedeploy);
 
                 // execute check operation, which registers a new consumer to the existing queue and process the queue
