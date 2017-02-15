@@ -29,6 +29,7 @@ public class RedisquesAPI {
 
     public enum QueueOperation {
         enqueue(null),
+        lockedEnqueue(null),
         check(null),
         reset(null),
         stop(null),
@@ -91,6 +92,12 @@ public class RedisquesAPI {
 
     public static JsonObject buildEnqueueOperation(String queueName, String message){
         JsonObject operation = buildOperation(QueueOperation.enqueue, new JsonObject().put(QUEUENAME, queueName));
+        operation.put(MESSAGE, message);
+        return operation;
+    }
+
+    public static JsonObject buildLockedEnqueueOperation(String queueName, String message, String lockRequestedBy){
+        JsonObject operation = buildOperation(QueueOperation.lockedEnqueue, new JsonObject().put(QUEUENAME, queueName).put(REQUESTED_BY, lockRequestedBy));
         operation.put(MESSAGE, message);
         return operation;
     }

@@ -1,5 +1,6 @@
 package org.swisspush.redisques.util;
 
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
 import org.junit.Test;
@@ -20,6 +21,8 @@ public class RedisquesAPITest {
         context.assertNull(QueueOperation.fromString("abc"));
         context.assertNull(QueueOperation.fromString("dummy"));
         context.assertNull(QueueOperation.fromString("doEnqueueThisItemPlease"));
+        context.assertNull(QueueOperation.fromString(""));
+        context.assertNull(QueueOperation.fromString(null));
 
         context.assertEquals(QueueOperation.check, QueueOperation.fromString("check"));
         context.assertEquals(QueueOperation.check, QueueOperation.fromString("CHECK"));
@@ -82,5 +85,150 @@ public class RedisquesAPITest {
         context.assertFalse(QueueOperation.getQueues.hasLegacyName());
         context.assertFalse(QueueOperation.getQueuesCount.hasLegacyName());
         context.assertFalse(QueueOperation.getQueueItemsCount.hasLegacyName());
+    }
+
+    @Test
+    public void testBuildEnqueueOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildEnqueueOperation("my_queue_name", "my_queue_value");
+        JsonObject expected = buildExpectedJsonObject("enqueue", new JsonObject().put("queuename", "my_queue_name"), "my_queue_value");
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildLockedEnqueueOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildLockedEnqueueOperation("my_queue_name", "my_queue_value", "lockUser");
+        JsonObject expected = buildExpectedJsonObject("lockedEnqueue",
+                new JsonObject().put("queuename", "my_queue_name").put("requestedBy", "lockUser"), "my_queue_value");
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildGetQueueItemsOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildGetQueueItemsOperation("my_queue_name", "99");
+        JsonObject expected = buildExpectedJsonObject("getQueueItems", new JsonObject()
+                .put("queuename", "my_queue_name")
+                .put("limit", "99"));
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildAddQueueItemOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildAddQueueItemOperation("my_queue_name", "buffer_value");
+        JsonObject expected = buildExpectedJsonObject("addQueueItem", new JsonObject()
+                .put("queuename", "my_queue_name")
+                .put("buffer", "buffer_value"));
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildGetQueueItemOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildGetQueueItemOperation("my_queue_name", 22);
+        JsonObject expected = buildExpectedJsonObject("getQueueItem", new JsonObject()
+                .put("queuename", "my_queue_name")
+                .put("index", 22));
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildReplaceQueueItemOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildReplaceQueueItemOperation("my_queue_name", 22, "buffer_value");
+        JsonObject expected = buildExpectedJsonObject("replaceQueueItem", new JsonObject()
+                .put("queuename", "my_queue_name")
+                .put("index", 22)
+                .put("buffer", "buffer_value"));
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildDeleteQueueItemOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildDeleteQueueItemOperation("my_queue_name", 11);
+        JsonObject expected = buildExpectedJsonObject("deleteQueueItem", new JsonObject()
+                .put("queuename", "my_queue_name")
+                .put("index", 11));
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildDeleteAllQueueItemsOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildDeleteAllQueueItemsOperation("my_queue_name");
+        JsonObject expected = buildExpectedJsonObject("deleteAllQueueItems", new JsonObject()
+                .put("queuename", "my_queue_name"));
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildGetQueuesOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildGetQueuesOperation();
+        context.assertEquals(buildExpectedJsonObject("getQueues"), operation);
+    }
+
+    @Test
+    public void testBuildGetQueuesCountOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildGetQueuesCountOperation();
+        context.assertEquals(buildExpectedJsonObject("getQueuesCount"), operation);
+    }
+
+
+    @Test
+    public void testBuildGetQueueItemsCountOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildGetQueueItemsCountOperation("my_queue_name");
+        JsonObject expected = buildExpectedJsonObject("getQueueItemsCount", new JsonObject()
+                .put("queuename", "my_queue_name"));
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildGetLockOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildGetLockOperation("my_queue_name");
+        JsonObject expected = buildExpectedJsonObject("getLock", new JsonObject()
+                .put("queuename", "my_queue_name"));
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildDeleteLockOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildDeleteLockOperation("my_queue_name");
+        JsonObject expected = buildExpectedJsonObject("deleteLock", new JsonObject()
+                .put("queuename", "my_queue_name"));
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildPutLockOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildPutLockOperation("my_queue_name", "request_user");
+        JsonObject expected = buildExpectedJsonObject("putLock", new JsonObject()
+                .put("queuename", "my_queue_name")
+                .put("requestedBy", "request_user"));
+        context.assertEquals(expected, operation);
+    }
+
+    @Test
+    public void testBuildGetAllLocksOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildGetAllLocksOperation();
+        context.assertEquals(buildExpectedJsonObject("getAllLocks"), operation);
+    }
+
+    @Test
+    public void testBuildCheckOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildCheckOperation();
+        context.assertEquals(buildExpectedJsonObject("check"), operation);
+    }
+
+    private JsonObject buildExpectedJsonObject(String operation){
+        JsonObject expected = new JsonObject();
+        expected.put("operation", operation);
+        return expected;
+    }
+
+    private JsonObject buildExpectedJsonObject(String operation, JsonObject payload){
+        JsonObject expected = buildExpectedJsonObject(operation);
+        expected.put("payload", payload);
+        return expected;
+    }
+
+    private JsonObject buildExpectedJsonObject(String operation, JsonObject payload, String message){
+        JsonObject expected = buildExpectedJsonObject(operation, payload);
+        expected.put("message", message);
+        return expected;
     }
 }
