@@ -1,6 +1,6 @@
 # vertx-redisques
 
-[![Build Status](https://drone.io/github.com/swisspush/vertx-redisques/status.png)](https://drone.io/github.com/swisspush/vertx-redisques/latest)
+[![Build Status](https://travis-ci.org/swisspush/vertx-redisques.svg?branch=master)](https://travis-ci.org/swisspush/vertx-redisques)
 [![Maven Central](https://img.shields.io/maven-central/v/org.swisspush/redisques.svg)](http://search.maven.org/#artifactdetails|org.swisspush|redisques|2.2.0|)
 
 A highly scalable redis-persistent queuing system for vert.x.
