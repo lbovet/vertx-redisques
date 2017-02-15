@@ -6,4 +6,4 @@ env:
 services:
    - redis-server
 script: 
-   - gradle clean build 
+   - ./gradlew test
