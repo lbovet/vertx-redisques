@@ -166,13 +166,13 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         items.add("locks/");
         items.add("queues/");
         items.add("monitor/");
-        result.put(lastPart(ctx.request().path(), "/"), items);
+        result.put(lastPart(ctx.request().path()), items);
         ctx.response().putHeader(CONTENT_TYPE, APPLICATION_JSON);
         ctx.response().end(result.encode());
     }
 
     private void enqueueOrLockedEnqueue(RoutingContext ctx) {
-        final String queue = part(ctx.request().path(), "/", 1);
+        final String queue = part(ctx.request().path(), 1);
         ctx.request().bodyHandler(buffer -> {
             try {
                 String strBuffer = encode(buffer.toString());
@@ -194,82 +194,62 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
     }
 
     private void getAllLocks(RoutingContext ctx) {
-        eventBus.send(redisquesAddress, buildGetAllLocksOperation(), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                if (OK.equals(reply.result().body().getString(STATUS))) {
-                    jsonResponse(ctx.response(), reply.result().body().getJsonObject(VALUE));
-                } else {
-                    respondWith(StatusCode.NOT_FOUND, ctx.request());
-                }
+        eventBus.send(redisquesAddress, buildGetAllLocksOperation(), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+            if (OK.equals(reply.result().body().getString(STATUS))) {
+                jsonResponse(ctx.response(), reply.result().body().getJsonObject(VALUE));
+            } else {
+                respondWith(StatusCode.NOT_FOUND, ctx.request());
             }
         });
     }
 
     private void addLock(RoutingContext ctx) {
-        String queue = lastPart(ctx.request().path(), "/");
-        eventBus.send(redisquesAddress, buildPutLockOperation(queue, extractUser(ctx.request())), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                checkReply(reply.result(), ctx.request(), StatusCode.BAD_REQUEST);
-            }
-        });
+        String queue = lastPart(ctx.request().path());
+        eventBus.send(redisquesAddress, buildPutLockOperation(queue, extractUser(ctx.request())),
+                (Handler<AsyncResult<Message<JsonObject>>>) reply -> checkReply(reply.result(), ctx.request(), StatusCode.BAD_REQUEST));
     }
 
     private void getSingleLock(RoutingContext ctx) {
-        String queue = lastPart(ctx.request().path(), "/");
-        eventBus.send(redisquesAddress, buildGetLockOperation(queue), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                if (OK.equals(reply.result().body().getString(STATUS))) {
-                    ctx.response().putHeader(CONTENT_TYPE, APPLICATION_JSON);
-                    ctx.response().end(reply.result().body().getString(VALUE));
-                } else {
-                    ctx.response().setStatusCode(StatusCode.NOT_FOUND.getStatusCode());
-                    ctx.response().setStatusMessage(StatusCode.NOT_FOUND.getStatusMessage());
-                    ctx.response().end(NO_SUCH_LOCK);
-                }
+        String queue = lastPart(ctx.request().path());
+        eventBus.send(redisquesAddress, buildGetLockOperation(queue), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+            if (OK.equals(reply.result().body().getString(STATUS))) {
+                ctx.response().putHeader(CONTENT_TYPE, APPLICATION_JSON);
+                ctx.response().end(reply.result().body().getString(VALUE));
+            } else {
+                ctx.response().setStatusCode(StatusCode.NOT_FOUND.getStatusCode());
+                ctx.response().setStatusMessage(StatusCode.NOT_FOUND.getStatusMessage());
+                ctx.response().end(NO_SUCH_LOCK);
             }
         });
     }
 
     private void deleteSingleLock(RoutingContext ctx) {
-        String queue = lastPart(ctx.request().path(), "/");
-        eventBus.send(redisquesAddress, buildDeleteLockOperation(queue), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                checkReply(reply.result(), ctx.request(), StatusCode.INTERNAL_SERVER_ERROR);
-            }
-        });
+        String queue = lastPart(ctx.request().path());
+        eventBus.send(redisquesAddress, buildDeleteLockOperation(queue),
+                (Handler<AsyncResult<Message<JsonObject>>>) reply -> checkReply(reply.result(), ctx.request(), StatusCode.INTERNAL_SERVER_ERROR));
     }
 
     private void getQueuesCount(RoutingContext ctx) {
-        eventBus.send(redisquesAddress, buildGetQueuesCountOperation(), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
-                    JsonObject result = new JsonObject();
-                    result.put("count", reply.result().body().getLong(VALUE));
-                    jsonResponse(ctx.response(), result);
-                } else {
-                    respondWith(StatusCode.INTERNAL_SERVER_ERROR, "Error gathering count of active queues", ctx.request());
-                }
+        eventBus.send(redisquesAddress, buildGetQueuesCountOperation(), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+            if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
+                JsonObject result = new JsonObject();
+                result.put("count", reply.result().body().getLong(VALUE));
+                jsonResponse(ctx.response(), result);
+            } else {
+                respondWith(StatusCode.INTERNAL_SERVER_ERROR, "Error gathering count of active queues", ctx.request());
             }
         });
     }
 
     private void getQueueItemsCount(RoutingContext ctx) {
-        final String queue = lastPart(ctx.request().path(), "/");
-        eventBus.send(redisquesAddress, buildGetQueueItemsCountOperation(queue), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
-                    JsonObject result = new JsonObject();
-                    result.put("count", reply.result().body().getLong(VALUE));
-                    jsonResponse(ctx.response(), result);
-                } else {
-                    respondWith(StatusCode.INTERNAL_SERVER_ERROR, "Error gathering count of active queue items", ctx.request());
-                }
+        final String queue = lastPart(ctx.request().path());
+        eventBus.send(redisquesAddress, buildGetQueueItemsCountOperation(queue), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+            if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
+                JsonObject result = new JsonObject();
+                result.put("count", reply.result().body().getLong(VALUE));
+                jsonResponse(ctx.response(), result);
+            } else {
+                respondWith(StatusCode.INTERNAL_SERVER_ERROR, "Error gathering count of active queue items", ctx.request());
             }
         });
     }
@@ -278,27 +258,25 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         boolean emptyQueues = ctx.request().params().contains("emptyQueues");
         final JsonObject resultObject = new JsonObject();
         final JsonArray queuesArray = new JsonArray();
-        eventBus.send(redisquesAddress, buildGetQueuesOperation(), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
-                    final List<String> queueNames = reply.result().body().getJsonObject(VALUE).getJsonArray("queues").getList();
-                    collectQueueLengths(queueNames, extractLimit(ctx), emptyQueues, mapEntries -> {
-                        for (Map.Entry<String, Long> entry : mapEntries) {
-                            JsonObject obj = new JsonObject();
-                            obj.put("name", entry.getKey());
-                            obj.put("size", entry.getValue());
-                            queuesArray.add(obj);
-                        }
-                        resultObject.put("queues", queuesArray);
-                        jsonResponse(ctx.response(), resultObject);
-                    });
-                } else {
-                    String error = "Error gathering names of active queues";
-                    log.error(error);
-                    respondWith(StatusCode.INTERNAL_SERVER_ERROR, error, ctx.request());
-                }
-            }});
+        eventBus.send(redisquesAddress, buildGetQueuesOperation(), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+            if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
+                final List<String> queueNames = reply.result().body().getJsonObject(VALUE).getJsonArray("queues").getList();
+                collectQueueLengths(queueNames, extractLimit(ctx), emptyQueues, mapEntries -> {
+                    for (Map.Entry<String, Long> entry : mapEntries) {
+                        JsonObject obj = new JsonObject();
+                        obj.put("name", entry.getKey());
+                        obj.put("size", entry.getValue());
+                        queuesArray.add(obj);
+                    }
+                    resultObject.put("queues", queuesArray);
+                    jsonResponse(ctx.response(), resultObject);
+                });
+            } else {
+                String error = "Error gathering names of active queues";
+                log.error(error);
+                respondWith(StatusCode.INTERNAL_SERVER_ERROR, error, ctx.request());
+            }
+        });
     }
 
     private void listOrCountQueues(RoutingContext ctx) {
@@ -310,14 +288,11 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
     }
 
     private void listQueues(RoutingContext ctx) {
-        eventBus.send(redisquesAddress, buildGetQueuesOperation(), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
-                    jsonResponse(ctx.response(), reply.result().body().getJsonObject(VALUE));
-                } else {
-                    respondWith(StatusCode.INTERNAL_SERVER_ERROR, "Error gathering names of active queues", ctx.request());
-                }
+        eventBus.send(redisquesAddress, buildGetQueuesOperation(), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+            if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
+                jsonResponse(ctx.response(), reply.result().body().getJsonObject(VALUE));
+            } else {
+                respondWith(StatusCode.INTERNAL_SERVER_ERROR, "Error gathering names of active queues", ctx.request());
             }
         });
     }
@@ -331,43 +306,36 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
     }
 
     private void listQueueItems(RoutingContext ctx) {
-        final String queue = lastPart(ctx.request().path(), "/");
+        final String queue = lastPart(ctx.request().path());
         String limitParam = null;
         if (ctx.request() != null && ctx.request().params().contains("limit")) {
             limitParam = ctx.request().params().get("limit");
         }
-        eventBus.send(redisquesAddress, buildGetQueueItemsOperation(queue, limitParam), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                JsonObject replyBody = reply.result().body();
-                if (OK.equals(replyBody.getString(STATUS))) {
-                    List<Object> list = reply.result().body().getJsonArray(VALUE).getList();
-                    JsonArray items = new JsonArray();
-                    for (Object item : list.toArray()) {
-                        items.add((String) item);
-                    }
-                    JsonObject result = new JsonObject().put(queue, items);
-                    jsonResponse(ctx.response(), result);
-                } else {
-                    ctx.response().setStatusCode(StatusCode.NOT_FOUND.getStatusCode());
-                    ctx.response().end(reply.result().body().getString("message"));
-                    log.warn("Error in routerMatcher.getWithRegEx. Command = '" + (replyBody.getString("command") == null ? "<null>" : replyBody.getString("command")) + "'.");
+        eventBus.send(redisquesAddress, buildGetQueueItemsOperation(queue, limitParam), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+            JsonObject replyBody = reply.result().body();
+            if (OK.equals(replyBody.getString(STATUS))) {
+                List<Object> list = reply.result().body().getJsonArray(VALUE).getList();
+                JsonArray items = new JsonArray();
+                for (Object item : list.toArray()) {
+                    items.add((String) item);
                 }
+                JsonObject result = new JsonObject().put(queue, items);
+                jsonResponse(ctx.response(), result);
+            } else {
+                ctx.response().setStatusCode(StatusCode.NOT_FOUND.getStatusCode());
+                ctx.response().end(reply.result().body().getString("message"));
+                log.warn("Error in routerMatcher.getWithRegEx. Command = '" + (replyBody.getString("command") == null ? "<null>" : replyBody.getString("command")) + "'.");
             }
         });
     }
 
     private void addQueueItem(RoutingContext ctx) {
-        final String queue = part(ctx.request().path(), "/", 1);
+        final String queue = part(ctx.request().path(), 1);
         ctx.request().bodyHandler(buffer -> {
             try {
                 String strBuffer = encode(buffer.toString());
-                eventBus.send(redisquesAddress, buildAddQueueItemOperation(queue, strBuffer), new Handler<AsyncResult<Message<JsonObject>>>() {
-                    @Override
-                    public void handle(AsyncResult<Message<JsonObject>> reply) {
-                        checkReply(reply.result(), ctx.request(), StatusCode.BAD_REQUEST);
-                    }
-                });
+                eventBus.send(redisquesAddress, buildAddQueueItemOperation(queue, strBuffer),
+                        (Handler<AsyncResult<Message<JsonObject>>>) reply -> checkReply(reply.result(), ctx.request(), StatusCode.BAD_REQUEST));
             } catch (Exception ex) {
                 respondWith(StatusCode.BAD_REQUEST, ex.getMessage(), ctx.request());
             }
@@ -375,37 +343,30 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
     }
 
     private void getSingleQueueItem(RoutingContext ctx) {
-        final String queue = lastPart(ctx.request().path().substring(0, ctx.request().path().length() - 2), "/");
-        final int index = Integer.parseInt(lastPart(ctx.request().path(), "/"));
-        eventBus.send(redisquesAddress, buildGetQueueItemOperation(queue, index), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                JsonObject replyBody = reply.result().body();
-                if (OK.equals(replyBody.getString(STATUS))) {
-                    ctx.response().putHeader(CONTENT_TYPE, APPLICATION_JSON);
-                    ctx.response().end(decode(reply.result().body().getString(VALUE)));
-                } else {
-                    ctx.response().setStatusCode(StatusCode.NOT_FOUND.getStatusCode());
-                    ctx.response().setStatusMessage(StatusCode.NOT_FOUND.getStatusMessage());
-                    ctx.response().end("Not Found");
-                }
+        final String queue = lastPart(ctx.request().path().substring(0, ctx.request().path().length() - 2));
+        final int index = Integer.parseInt(lastPart(ctx.request().path()));
+        eventBus.send(redisquesAddress, buildGetQueueItemOperation(queue, index), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+            JsonObject replyBody = reply.result().body();
+            if (OK.equals(replyBody.getString(STATUS))) {
+                ctx.response().putHeader(CONTENT_TYPE, APPLICATION_JSON);
+                ctx.response().end(decode(reply.result().body().getString(VALUE)));
+            } else {
+                ctx.response().setStatusCode(StatusCode.NOT_FOUND.getStatusCode());
+                ctx.response().setStatusMessage(StatusCode.NOT_FOUND.getStatusMessage());
+                ctx.response().end("Not Found");
             }
         });
     }
 
     private void replaceSingleQueueItem(RoutingContext ctx){
-        final String queue = part(ctx.request().path(), "/", 2);
+        final String queue = part(ctx.request().path(), 2);
         checkLocked(queue, ctx.request(), aVoid -> {
-            final int index = Integer.parseInt(lastPart(ctx.request().path(), "/"));
+            final int index = Integer.parseInt(lastPart(ctx.request().path()));
             ctx.request().bodyHandler(buffer -> {
                 try {
                     String strBuffer = encode(buffer.toString());
-                    eventBus.send(redisquesAddress, buildReplaceQueueItemOperation(queue, index, strBuffer), new Handler<AsyncResult<Message<JsonObject>>>() {
-                        @Override
-                        public void handle(AsyncResult<Message<JsonObject>> reply) {
-                            checkReply(reply.result(), ctx.request(), StatusCode.NOT_FOUND);
-                        }
-                    });
+                    eventBus.send(redisquesAddress, buildReplaceQueueItemOperation(queue, index, strBuffer),
+                            (Handler<AsyncResult<Message<JsonObject>>>) reply -> checkReply(reply.result(), ctx.request(), StatusCode.NOT_FOUND));
                 } catch (Exception ex) {
                     respondWith(StatusCode.BAD_REQUEST, ex.getMessage(), ctx.request());
                 }
@@ -414,21 +375,15 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
     }
 
     private void deleteQueueItem(RoutingContext ctx) {
-        final String queue = part(ctx.request().path(), "/", 2);
-        final int index = Integer.parseInt(lastPart(ctx.request().path(), "/"));
-        checkLocked(queue, ctx.request(), aVoid -> eventBus.send(redisquesAddress, buildDeleteQueueItemOperation(queue, index), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                checkReply(reply.result(), ctx.request(), StatusCode.NOT_FOUND);
-            }
-        }));
+        final String queue = part(ctx.request().path(), 2);
+        final int index = Integer.parseInt(lastPart(ctx.request().path()));
+        checkLocked(queue, ctx.request(), aVoid -> eventBus.send(redisquesAddress, buildDeleteQueueItemOperation(queue, index),
+                (Handler<AsyncResult<Message<JsonObject>>>) reply -> checkReply(reply.result(), ctx.request(), StatusCode.NOT_FOUND)));
     }
 
     private void deleteAllQueueItems(RoutingContext ctx) {
-        final String queue = lastPart(ctx.request().path(), "/");
-        eventBus.send(redisquesAddress, buildDeleteAllQueueItemsOperation(queue), reply -> {
-            ctx.response().end();
-        });
+        final String queue = lastPart(ctx.request().path());
+        eventBus.send(redisquesAddress, buildDeleteAllQueueItemsOperation(queue), reply -> ctx.response().end());
     }
 
     private void respondWith(StatusCode statusCode, String responseMessage, HttpServerRequest request) {
@@ -442,13 +397,13 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         respondWith(statusCode, statusCode.getStatusMessage(), request);
     }
 
-    private String lastPart(String source, String separator) {
-        String[] tokens = source.split(separator);
+    private String lastPart(String source) {
+        String[] tokens = source.split("/");
         return tokens[tokens.length - 1];
     }
 
-    private String part(String source, String separator, int pos) {
-        String[] tokens = source.split(separator);
+    private String part(String source, int pos) {
+        String[] tokens = source.split("/");
         return tokens[tokens.length - pos];
     }
 
@@ -467,18 +422,15 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
 
     private void checkLocked(String queue, final HttpServerRequest request, final Handler<Void> handler) {
         request.pause();
-        eventBus.send(redisquesAddress, buildGetLockOperation(queue), new Handler<AsyncResult<Message<JsonObject>>>() {
-            @Override
-            public void handle(AsyncResult<Message<JsonObject>> reply) {
-                if (NO_SUCH_LOCK.equals(reply.result().body().getString(STATUS))) {
-                    request.resume();
-                    request.response().setStatusCode(StatusCode.CONFLICT.getStatusCode());
-                    request.response().setStatusMessage("Queue must be locked to perform this operation");
-                    request.response().end("Queue must be locked to perform this operation");
-                } else {
-                    handler.handle(null);
-                    request.resume();
-                }
+        eventBus.send(redisquesAddress, buildGetLockOperation(queue), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+            if (NO_SUCH_LOCK.equals(reply.result().body().getString(STATUS))) {
+                request.resume();
+                request.response().setStatusCode(StatusCode.CONFLICT.getStatusCode());
+                request.response().setStatusMessage("Queue must be locked to perform this operation");
+                request.response().end("Queue must be locked to perform this operation");
+            } else {
+                handler.handle(null);
+                request.resume();
             }
         });
     }
@@ -494,12 +446,12 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
     }
 
     /**
-     * Encode the payload from a payloadString or payloadObjet.
+     * Encode the payload from a payloadString or payloadObject.
      *
      * @param decoded decoded
      * @return String
      */
-    public String encode(String decoded) throws Exception {
+    private String encode(String decoded) throws Exception {
         JsonObject object = new JsonObject(decoded);
 
         String payloadString;
@@ -545,7 +497,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
      * @param encoded encoded
      * @return String
      */
-    public String decode(String encoded) {
+    private String decode(String encoded) {
         JsonObject object = new JsonObject(encoded);
         JsonArray headers = object.getJsonArray("headers");
         for (Object headerObj : headers) {
@@ -583,26 +535,23 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         final AtomicInteger subCommandCount = new AtomicInteger(queueNames.size());
         if (!queueNames.isEmpty()) {
             for (final String name : queueNames) {
-                eventBus.send(redisquesAddress, buildGetQueueItemsCountOperation(name), new Handler<AsyncResult<Message<JsonObject>>>() {
-                    @Override
-                    public void handle(AsyncResult<Message<JsonObject>> reply) {
-                        subCommandCount.decrementAndGet();
-                        if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
-                            final long count = reply.result().body().getLong(VALUE);
-                            if (showEmptyQueues || count > 0) {
-                                resultMap.put(name, count);
-                            }
-                        } else {
-                            log.error("Error gathering size of queue " + name);
+                eventBus.send(redisquesAddress, buildGetQueueItemsCountOperation(name), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+                    subCommandCount.decrementAndGet();
+                    if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
+                        final long count = reply.result().body().getLong(VALUE);
+                        if (showEmptyQueues || count > 0) {
+                            resultMap.put(name, count);
                         }
+                    } else {
+                        log.error("Error gathering size of queue " + name);
+                    }
 
-                        if (subCommandCount.get() == 0) {
-                            mapEntryList.addAll(resultMap.entrySet());
-                            sortResultMap(mapEntryList);
-                            int toIndex = limit > queueNames.size() ? queueNames.size() : limit;
-                            toIndex = Math.min(mapEntryList.size(), toIndex);
-                            callback.onDone(mapEntryList.subList(0, toIndex));
-                        }
+                    if (subCommandCount.get() == 0) {
+                        mapEntryList.addAll(resultMap.entrySet());
+                        sortResultMap(mapEntryList);
+                        int toIndex = limit > queueNames.size() ? queueNames.size() : limit;
+                        toIndex = Math.min(mapEntryList.size(), toIndex);
+                        callback.onDone(mapEntryList.subList(0, toIndex));
                     }
                 });
             }
@@ -623,6 +572,6 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
             }
         };
 
-        Collections.sort(input, byMapValues.reverse());
+        input.sort(byMapValues.reverse());
     }
 }
