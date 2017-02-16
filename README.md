@@ -126,6 +126,31 @@ Response Data
 }
 ```
 
+#### lockedEnqueue
+Request Data
+
+```
+{
+    "operation": "lockedEnqueue",
+    "payload": {
+        "queuename": <str QUEUENAME>,
+        "requestedBy": <str user who created the lock>
+    },
+    "message": {
+        "method": "POST",
+        "uri": <st REQUEST URI>,
+        "payload": null
+    }
+}
+```
+Response Data
+```
+{
+    "status": "ok" / "error",
+    "message": "enqueued" / <str RESULT>
+}
+```
+
 #### getQueues
 
 Request Data
@@ -478,6 +503,17 @@ The result will be a json object with the monitor information like the example b
   ]
 }
 ```
+
+### Enqueue
+To enqueue a new queue use
+> PUT /queuing/enqueue/myNewQueue
+
+having the payload in the request body. When the request body is not a valid json object, a statusCode 400 with the error message _'Bad Request'_ will be returned.
+
+Available url parameters are:
+* _locked_: Lock the queue before enqueuing to prevent processing
+
+When the _locked_ url parameter is set, the configured _httpRequestHandlerUserHeader_ property will be used to define the user which requested the lock. If no header is provided, "Unknown" will be used instead.
 
 ### List or count queues
 To list the active queues use

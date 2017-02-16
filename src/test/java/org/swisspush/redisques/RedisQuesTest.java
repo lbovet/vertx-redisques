@@ -80,6 +80,7 @@ public class RedisQuesTest extends AbstractTestCase {
             context.assertTrue(jedis.hexists(getLocksRedisKey(), "queueEnqueue"));
             assertLockContent(context, "queueEnqueue", "someuser");
             assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+            assertKeyCount(context, getLocksRedisKey(), 1);
             async.complete();
         });
     }

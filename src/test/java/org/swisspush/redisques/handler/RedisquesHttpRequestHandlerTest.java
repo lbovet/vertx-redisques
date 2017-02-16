@@ -211,6 +211,8 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(2L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
+        context.assertFalse(jedis.hexists(getLocksRedisKey(), queueName));
+
         async.complete();
     }
 
@@ -225,6 +227,74 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         given().body(queueItemInvalid).when().put("/queuing/enqueue/"+queueName+"/").then().assertThat().statusCode(400);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         context.assertEquals(0L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
+
+        context.assertFalse(jedis.hexists(getLocksRedisKey(), queueName));
+
+        async.complete();
+    }
+
+    @Test
+    public void lockedEnqueueValidBody(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
+        context.assertFalse(jedis.hexists(getLocksRedisKey(), queueName));
+
+        given().body(queueItemValid).when().put("/queuing/enqueue/"+queueName+"/?locked").then().assertThat().statusCode(200);
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+        context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
+        context.assertTrue(jedis.hexists(getLocksRedisKey(), queueName));
+        assertLockContent(context, queueName, "Unknown");
+
+        given().body(queueItemValid).when().put("/queuing/enqueue/"+queueName+"/?locked").then().assertThat().statusCode(200);
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+        context.assertEquals(2L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
+
+        async.complete();
+    }
+
+    @Test
+    public void lockedEnqueueValidBodyRequestedByHeader(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        long ts = System.currentTimeMillis();
+        String queueName = "queue_" + ts;
+        String requestedBy = "user_" + ts;
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
+        context.assertFalse(jedis.hexists(getLocksRedisKey(), queueName));
+
+        given()
+                .header("x-rp-usr", requestedBy)
+                .body(queueItemValid)
+                .when()
+                .put("/queuing/enqueue/"+queueName+"/?locked")
+                .then().assertThat().statusCode(200);
+
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+        context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
+        context.assertTrue(jedis.hexists(getLocksRedisKey(), queueName));
+        assertLockContent(context, queueName, requestedBy);
+
+        async.complete();
+    }
+
+    @Test
+    public void lockedEnqueueInvalidBody(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
+        context.assertFalse(jedis.hexists(getLocksRedisKey(), queueName));
+
+        given().body(queueItemInvalid).when().put("/queuing/enqueue/"+queueName+"/?locked").then().assertThat().statusCode(400);
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        context.assertEquals(0L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
+
+        context.assertFalse(jedis.hexists(getLocksRedisKey(), queueName));
 
         async.complete();
     }

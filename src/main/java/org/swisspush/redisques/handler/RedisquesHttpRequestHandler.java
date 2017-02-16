@@ -40,6 +40,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
 
     private static final String APPLICATION_JSON = "application/json";
     private static final String CONTENT_TYPE = "content-type";
+    private static final String LOCKED_PARAM = "locked";
 
     private final String redisquesAddress;
     private final String userHeader;
@@ -83,9 +84,9 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         router.get(prefix + "/monitor/").handler(this::getMonitorInformation);
 
         /*
-         * Enqueue
+         * Enqueue or LockedEnqueue
          */
-        router.putWithRegex(prefix + "/enqueue/([^/]+)/").handler(this::enqueue);
+        router.putWithRegex(prefix + "/enqueue/([^/]+)/").handler(this::enqueueOrLockedEnqueue);
 
         /*
          * List queue items
@@ -170,17 +171,26 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         ctx.response().end(result.encode());
     }
 
-    private void enqueue(RoutingContext ctx) {
+    private void enqueueOrLockedEnqueue(RoutingContext ctx) {
         final String queue = part(ctx.request().path(), "/", 1);
         ctx.request().bodyHandler(buffer -> {
             try {
                 String strBuffer = encode(buffer.toString());
-                eventBus.send(redisquesAddress, buildEnqueueOperation(queue, strBuffer),
+                eventBus.send(redisquesAddress, buildEnqueueOrLockedEnqueueOperation(queue, strBuffer, ctx.request()),
                         (Handler<AsyncResult<Message<JsonObject>>>) reply -> checkReply(reply.result(), ctx.request(), StatusCode.BAD_REQUEST));
             } catch (Exception ex) {
                 respondWith(StatusCode.BAD_REQUEST, ex.getMessage(), ctx.request());
             }
         });
+    }
+
+    private JsonObject buildEnqueueOrLockedEnqueueOperation(String queue, String message, HttpServerRequest request){
+        boolean lockedEnqueue = request.params().contains(LOCKED_PARAM);
+        if(lockedEnqueue){
+            return buildLockedEnqueueOperation(queue, message, extractUser(request));
+        } else {
+            return buildEnqueueOperation(queue, message);
+        }
     }
 
     private void getAllLocks(RoutingContext ctx) {
