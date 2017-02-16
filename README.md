@@ -5,6 +5,23 @@
 
 A highly scalable redis-persistent queuing system for vert.x.
 
+## Getting Started
+### Install
+* Clone this repository or unzip [archive](https://github.com/swisspush/vertx-redisques/archive/master.zip)
+* Install and start Redis
+  * Debian/Ubuntu: `apt-get install redis-server`
+  * Fedora/RedHat/CentOS: `yum install redis`
+  * OS X: `brew install redis`
+  * [Windows](https://github.com/MSOpenTech/redis/releases/download/win-2.8.2400/Redis-x64-2.8.2400.zip)
+  * [Other](http://redis.io/download)
+
+### Build
+You need Java 8 and gradle.
+```
+cd vertx-redisques
+gradle build
+```
+
 ## Dynamic Queues
 
 They are stored as redis lists, thus created only when needed and removed when empty. 
