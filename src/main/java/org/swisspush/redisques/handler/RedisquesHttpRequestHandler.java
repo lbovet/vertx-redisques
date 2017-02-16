@@ -83,6 +83,11 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         router.get(prefix + "/monitor/").handler(this::getMonitorInformation);
 
         /*
+         * Enqueue
+         */
+        router.putWithRegex(prefix + "/enqueue/([^/]+)/").handler(this::enqueue);
+
+        /*
          * List queue items
          */
         router.getWithRegex(prefix + "/monitor/[^/]+").handler(this::listQueueItems);
@@ -163,6 +168,19 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         result.put(lastPart(ctx.request().path(), "/"), items);
         ctx.response().putHeader(CONTENT_TYPE, APPLICATION_JSON);
         ctx.response().end(result.encode());
+    }
+
+    private void enqueue(RoutingContext ctx) {
+        final String queue = part(ctx.request().path(), "/", 1);
+        ctx.request().bodyHandler(buffer -> {
+            try {
+                String strBuffer = encode(buffer.toString());
+                eventBus.send(redisquesAddress, buildEnqueueOperation(queue, strBuffer),
+                        (Handler<AsyncResult<Message<JsonObject>>>) reply -> checkReply(reply.result(), ctx.request(), StatusCode.BAD_REQUEST));
+            } catch (Exception ex) {
+                respondWith(StatusCode.BAD_REQUEST, ex.getMessage(), ctx.request());
+            }
+        });
     }
 
     private void getAllLocks(RoutingContext ctx) {

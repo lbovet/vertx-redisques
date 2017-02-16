@@ -196,6 +196,40 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
     }
 
     @Test
+    public void enqueueValidBody(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
+
+        given().body(queueItemValid).when().put("/queuing/enqueue/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+        context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
+
+        given().body(queueItemValid).when().put("/queuing/enqueue/"+queueName+"/").then().assertThat().statusCode(200);
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+        context.assertEquals(2L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
+
+        async.complete();
+    }
+
+    @Test
+    public void enqueueInvalidBody(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        String queueName = "queue_" + System.currentTimeMillis();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
+
+        given().body(queueItemInvalid).when().put("/queuing/enqueue/"+queueName+"/").then().assertThat().statusCode(400);
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        context.assertEquals(0L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
+
+        async.complete();
+    }
+
+    @Test
     public void addQueueItemValidBody(TestContext context) {
         Async async = context.async();
         flushAll();

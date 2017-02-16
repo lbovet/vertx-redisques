@@ -678,13 +678,14 @@ public class RedisQues extends AbstractVerticle {
      * @param handler (optional) To get informed when done.
      */
     private void updateTimestamp(final String queue, Handler<AsyncResult<Long>> handler) {
+        long ts = System.currentTimeMillis();
         if (log.isTraceEnabled()) {
-            log.trace("RedisQues update timestamp for queue: " + queue + " to: " + System.currentTimeMillis());
+            log.trace("RedisQues update timestamp for queue: " + queue + " to: " + ts);
         }
         if (handler != null) {
-            redisClient.zadd(getQueuesKey(), System.currentTimeMillis(), queue, handler);
+            redisClient.zadd(getQueuesKey(), ts, queue, handler);
         } else {
-            redisClient.zadd(getQueuesKey(), System.currentTimeMillis(), queue, event -> {});
+            redisClient.zadd(getQueuesKey(), ts, queue, event -> {});
         }
     }
 
