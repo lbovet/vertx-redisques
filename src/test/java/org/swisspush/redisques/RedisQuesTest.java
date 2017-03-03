@@ -212,6 +212,91 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
+    public void deleteAllQueueItemsLegacyOperation(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        final String queue = "queue1";
+        eventBusSend(buildEnqueueOperation(queue, "some_val"), message -> {
+            context.assertEquals(OK, message.result().body().getString(STATUS));
+            assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+
+            // use legacy operation without any 'unlock' configuration
+            eventBusSend(buildOperation(QueueOperation.deleteAllQueueItems, new JsonObject().put(QUEUENAME, queue)), message1 -> {
+                context.assertEquals(OK, message1.result().body().getString(STATUS));
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                async.complete();
+            });
+        });
+    }
+
+    @Test
+    public void deleteAllQueueItemsWithLockLegacy(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        final String queue = "queue1";
+
+        eventBusSend(buildPutLockOperation(queue, "geronimo"), event -> {
+            context.assertTrue(jedis.hexists(getLocksRedisKey(), queue));
+            eventBusSend(buildEnqueueOperation(queue, "some_val"), message -> {
+                context.assertEquals(OK, message.result().body().getString(STATUS));
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+                eventBusSend(buildDeleteAllQueueItemsOperation(queue), message1 -> {
+                    context.assertEquals(OK, message1.result().body().getString(STATUS));
+                    assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                    context.assertTrue(jedis.hexists(getLocksRedisKey(), queue)); // check that lock still exists
+                    async.complete();
+                });
+            });
+        });
+    }
+
+    @Test
+    public void deleteAllQueueItemsWithLockDontUnlock(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        final String queue = "queue1";
+
+        eventBusSend(buildPutLockOperation(queue, "geronimo"), event -> {
+            context.assertTrue(jedis.hexists(getLocksRedisKey(), queue));
+            eventBusSend(buildEnqueueOperation(queue, "some_val"), message -> {
+                context.assertEquals(OK, message.result().body().getString(STATUS));
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+                eventBusSend(buildDeleteAllQueueItemsOperation(queue, false), message1 -> {
+                    context.assertEquals(OK, message1.result().body().getString(STATUS));
+                    assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                    context.assertTrue(jedis.hexists(getLocksRedisKey(), queue)); // check that lock still exists
+                    async.complete();
+                });
+            });
+        });
+    }
+
+    @Test
+    public void deleteAllQueueItemsWithLockDoUnlock(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        final String queue = "queue1";
+
+        eventBusSend(buildPutLockOperation(queue, "geronimo"), event -> {
+            context.assertTrue(jedis.hexists(getLocksRedisKey(), queue));
+            eventBusSend(buildEnqueueOperation(queue, "some_val"), message -> {
+                context.assertEquals(OK, message.result().body().getString(STATUS));
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+                eventBusSend(buildDeleteAllQueueItemsOperation(queue, true), message1 -> {
+                    context.assertEquals(OK, message1.result().body().getString(STATUS));
+                    assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                    context.assertFalse(jedis.hexists(getLocksRedisKey(), queue)); // check that lock doesn't exist anymore
+                    async.complete();
+                });
+            });
+        });
+    }
+
+    @Test
     public void addQueueItem(TestContext context) {
         Async async = context.async();
         flushAll();
