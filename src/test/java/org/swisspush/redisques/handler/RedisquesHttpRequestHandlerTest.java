@@ -690,6 +690,89 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
     }
 
     @Test
+    public void deleteAllQueueItemsWithUnlockOfNonExistingLock(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        eventBusSend(buildEnqueueOperation("queueEnqueue", "helloEnqueue"), message -> {
+            assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+
+            // delete all queue items
+            when().delete("/queuing/queues/queueEnqueue?unlock")
+                    .then().assertThat()
+                    .statusCode(200);
+            assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+
+            // delete all queue items again
+            when().delete("/queuing/queues/queueEnqueue")
+                    .then().assertThat()
+                    .statusCode(200);
+            assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+
+            async.complete();
+        });
+    }
+
+    @Test
+    public void deleteAllQueueItemsWithNoUnlockOfExistingLock(TestContext context) {
+        Async async = context.async();
+        flushAll();
+
+        eventBusSend(buildPutLockOperation("queueEnqueue", "someuser"), putLockMessage -> {
+            context.assertTrue(jedis.hexists(getLocksRedisKey(), "queueEnqueue"));
+
+            eventBusSend(buildEnqueueOperation("queueEnqueue", "helloEnqueue"), message -> {
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+
+                // delete all queue items
+                when().delete("/queuing/queues/queueEnqueue")
+                        .then().assertThat()
+                        .statusCode(200);
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                context.assertTrue(jedis.hexists(getLocksRedisKey(), "queueEnqueue"));
+
+                // delete all queue items again
+                when().delete("/queuing/queues/queueEnqueue")
+                        .then().assertThat()
+                        .statusCode(200);
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                context.assertTrue(jedis.hexists(getLocksRedisKey(), "queueEnqueue"));
+
+                async.complete();
+            });
+        });
+    }
+
+    @Test
+    public void deleteAllQueueItemsWithDoUnlockOfExistingLock(TestContext context) {
+        Async async = context.async();
+        flushAll();
+
+        eventBusSend(buildPutLockOperation("queueEnqueue", "someuser"), putLockMessage -> {
+            context.assertTrue(jedis.hexists(getLocksRedisKey(), "queueEnqueue"));
+
+            eventBusSend(buildEnqueueOperation("queueEnqueue", "helloEnqueue"), message -> {
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+
+                // delete all queue items
+                when().delete("/queuing/queues/queueEnqueue?unlock")
+                        .then().assertThat()
+                        .statusCode(200);
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                context.assertFalse(jedis.hexists(getLocksRedisKey(), "queueEnqueue"));
+
+                // delete all queue items again
+                when().delete("/queuing/queues/queueEnqueue")
+                        .then().assertThat()
+                        .statusCode(200);
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                context.assertFalse(jedis.hexists(getLocksRedisKey(), "queueEnqueue"));
+
+                async.complete();
+            });
+        });
+    }
+
+    @Test
     public void deleteAllQueueItemsOfNonExistingQueue(TestContext context) {
         Async async = context.async();
         flushAll();

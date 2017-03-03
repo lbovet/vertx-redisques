@@ -21,6 +21,7 @@ public class RedisquesAPI {
     public static final String MESSAGE = "message";
     public static final String PAYLOAD = "payload";
     public static final String QUEUENAME = "queuename";
+    public static final String UNLOCK = "unlock";
     public static final String OPERATION = "operation";
     public static final String REQUESTED_BY = "requestedBy";
     public static final String NO_SUCH_LOCK = "No such lock";
@@ -123,7 +124,11 @@ public class RedisquesAPI {
     }
 
     public static JsonObject buildDeleteAllQueueItemsOperation(String queueName){
-        return buildOperation(QueueOperation.deleteAllQueueItems, new JsonObject().put(QUEUENAME, queueName));
+        return buildDeleteAllQueueItemsOperation(queueName, false);
+    }
+
+    public static JsonObject buildDeleteAllQueueItemsOperation(String queueName, boolean unlock){
+        return buildOperation(QueueOperation.deleteAllQueueItems, new JsonObject().put(QUEUENAME, queueName).put("unlock", unlock));
     }
 
     public static JsonObject buildGetQueuesOperation(){

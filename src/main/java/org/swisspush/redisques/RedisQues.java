@@ -172,7 +172,7 @@ public class RedisQues extends AbstractVerticle {
                     replaceQueueItem(event);
                     break;
                 case deleteAllQueueItems:
-                    redisClient.del(getQueuesPrefix() + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new DeleteAllQueueItems(event));
+                    deleteAllQueueItems(event);
                     break;
                 case getAllLocks:
                     redisClient.hkeys(getLocksKey(), new GetAllLocksHandler(event));
@@ -328,6 +328,29 @@ public class RedisQues extends AbstractVerticle {
                 event.reply(new JsonObject().put(STATUS, ERROR));
             }
         });
+    }
+
+    private void deleteAllQueueItems(Message<JsonObject> event){
+        JsonObject payload = event.body().getJsonObject(PAYLOAD);
+        boolean unlock = payload.getBoolean(UNLOCK, false);
+        String queue = payload.getString(QUEUENAME);
+        redisClient.del(getQueuesPrefix() + queue, deleteReply -> {
+            if(unlock) {
+                redisClient.hdel(getLocksKey(), queue, unlockReply -> {
+                    replyDeleteAllQueueItems(event, deleteReply);
+                });
+            } else {
+                replyDeleteAllQueueItems(event, deleteReply);
+            }
+        });
+    }
+
+    private void replyDeleteAllQueueItems(Message<JsonObject> event, AsyncResult<Long> deleteReply){
+        if (deleteReply.result() > 0) {
+            event.reply(new JsonObject().put(STATUS, OK));
+        } else {
+            event.reply(new JsonObject().put(STATUS, ERROR));
+        }
     }
 
     private void putLock(Message<JsonObject> event){
