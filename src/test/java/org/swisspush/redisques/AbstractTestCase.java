@@ -12,7 +12,6 @@ import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
 import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 import redis.clients.jedis.Jedis;
 
@@ -70,18 +69,8 @@ public abstract class AbstractTestCase {
         }
     }
 
-    @BeforeClass
-    public static void config(TestContext context) {
-        if(!RedisEmbeddedConfiguration.useExternalRedis()) {
-            RedisEmbeddedConfiguration.redisServer.start();
-        }
-    }
-
     @AfterClass
     public static void stopRedis(TestContext context) {
-        if(!RedisEmbeddedConfiguration.useExternalRedis()) {
-            RedisEmbeddedConfiguration.redisServer.stop();
-        }
         jedis.close();
     }
 

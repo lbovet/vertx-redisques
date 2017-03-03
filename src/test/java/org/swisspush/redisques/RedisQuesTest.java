@@ -70,6 +70,43 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
+    public void lockedEnqueue(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        eventBusSend(buildLockedEnqueueOperation("queueEnqueue", "helloEnqueue", "someuser"), message -> {
+            context.assertEquals(OK, message.result().body().getString(STATUS));
+            context.assertEquals("helloEnqueue", jedis.lindex(getQueuesRedisKeyPrefix() + "queueEnqueue", 0));
+            context.assertTrue(jedis.hexists(getLocksRedisKey(), "queueEnqueue"));
+            assertLockContent(context, "queueEnqueue", "someuser");
+            assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+            assertKeyCount(context, getLocksRedisKey(), 1);
+            async.complete();
+        });
+    }
+
+    @Test
+    public void lockedEnqueueMissingRequestedBy(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getLocksRedisKey(), 0);
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        context.assertFalse(jedis.hexists(getLocksRedisKey(), "queue1"));
+
+        JsonObject operation = buildOperation(QueueOperation.lockedEnqueue, new JsonObject().put(QUEUENAME, "queue1"));
+        operation.put(MESSAGE, "helloEnqueue");
+
+        eventBusSend(operation, message -> {
+            context.assertEquals(ERROR, message.result().body().getString(STATUS));
+            context.assertEquals("Property '"+REQUESTED_BY+"' missing", message.result().body().getString(MESSAGE));
+            assertKeyCount(context, getLocksRedisKey(), 0);
+            assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+            context.assertFalse(jedis.hexists(getLocksRedisKey(), "queue1"));
+            async.complete();
+        });
+    }
+
+    @Test
     public void getQueueItems(TestContext context) {
         Async async = context.async();
         flushAll();
