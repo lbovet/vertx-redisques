@@ -365,7 +365,8 @@ Request Data
 {
     "operation": "deleteAllQueueItems",
     "payload": {
-        "queuename": <str QUEUENAME>
+        "queuename": <str QUEUENAME>,
+        "unlock": true/false
     }
 }
 ```
@@ -578,6 +579,9 @@ The result will be a json object with the count of queue items like the example 
 ### Delete all queue items
 To delete all queue items of a single queue use
 > DELETE /queuing/queues/myQueue
+
+Available url parameters are:
+* _unlock_: Unlock the queue after deleting all queue items
 
 ### Get single queue item
 To get a single queue item use
