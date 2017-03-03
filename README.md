@@ -1,9 +1,27 @@
 # vertx-redisques
 
-[![Build Status](https://drone.io/github.com/swisspush/vertx-redisques/status.png)](https://drone.io/github.com/swisspush/vertx-redisques/latest)
+[![Build Status](https://travis-ci.org/swisspush/vertx-redisques.svg?branch=master)](https://travis-ci.org/swisspush/vertx-redisques)
+[![codecov](https://codecov.io/gh/swisspush/vertx-redisques/branch/master/graph/badge.svg)](https://codecov.io/gh/swisspush/vertx-redisques)
 [![Maven Central](https://img.shields.io/maven-central/v/org.swisspush/redisques.svg)](http://search.maven.org/#artifactdetails|org.swisspush|redisques|2.2.0|)
 
 A highly scalable redis-persistent queuing system for vert.x.
+
+## Getting Started
+### Install
+* Clone this repository or unzip [archive](https://github.com/swisspush/vertx-redisques/archive/master.zip)
+* Install and start Redis
+  * Debian/Ubuntu: `apt-get install redis-server`
+  * Fedora/RedHat/CentOS: `yum install redis`
+  * OS X: `brew install redis`
+  * [Windows](https://github.com/MSOpenTech/redis/releases/download/win-2.8.2400/Redis-x64-2.8.2400.zip)
+  * [Other](http://redis.io/download)
+
+### Build
+You need Java 8 and gradle.
+```
+cd vertx-redisques
+gradle build
+```
 
 ## Dynamic Queues
 
@@ -102,6 +120,31 @@ Request Data
 
 Response Data
 
+```
+{
+    "status": "ok" / "error",
+    "message": "enqueued" / <str RESULT>
+}
+```
+
+#### lockedEnqueue
+Request Data
+
+```
+{
+    "operation": "lockedEnqueue",
+    "payload": {
+        "queuename": <str QUEUENAME>,
+        "requestedBy": <str user who created the lock>
+    },
+    "message": {
+        "method": "POST",
+        "uri": <st REQUEST URI>,
+        "payload": null
+    }
+}
+```
+Response Data
 ```
 {
     "status": "ok" / "error",
@@ -461,6 +504,17 @@ The result will be a json object with the monitor information like the example b
   ]
 }
 ```
+
+### Enqueue
+To enqueue a new queue use
+> PUT /queuing/enqueue/myNewQueue
+
+having the payload in the request body. When the request body is not a valid json object, a statusCode 400 with the error message _'Bad Request'_ will be returned.
+
+Available url parameters are:
+* _locked_: Lock the queue before enqueuing to prevent processing
+
+When the _locked_ url parameter is set, the configured _httpRequestHandlerUserHeader_ property will be used to define the user which requested the lock. If no header is provided, "Unknown" will be used instead.
 
 ### List or count queues
 To list the active queues use

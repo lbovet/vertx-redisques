@@ -2,11 +2,8 @@ package org.swisspush.redisques.lua;
 
 import io.vertx.ext.unit.junit.VertxUnitRunner;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
-import org.swisspush.redisques.RedisEmbeddedConfiguration;
 import redis.clients.jedis.Jedis;
 
 import java.io.BufferedReader;
@@ -21,20 +18,6 @@ import java.util.ArrayList;
 public abstract class AbstractLuaScriptTest {
 
     Jedis jedis = null;
-
-    @BeforeClass
-    public static void config() {
-        if(!RedisEmbeddedConfiguration.useExternalRedis()) {
-            RedisEmbeddedConfiguration.redisServer.start();
-        }
-    }
-
-    @AfterClass
-    public static void stopRedis() {
-        if(!RedisEmbeddedConfiguration.useExternalRedis()) {
-            RedisEmbeddedConfiguration.redisServer.stop();
-        }
-    }
 
     @Before
     public void connect() {
