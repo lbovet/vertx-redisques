@@ -382,8 +382,9 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
     }
 
     private void deleteAllQueueItems(RoutingContext ctx) {
+        boolean unlock = ctx.request().params().contains("unlock");
         final String queue = lastPart(ctx.request().path());
-        eventBus.send(redisquesAddress, buildDeleteAllQueueItemsOperation(queue), reply -> ctx.response().end());
+        eventBus.send(redisquesAddress, buildDeleteAllQueueItemsOperation(queue, unlock), reply -> ctx.response().end());
     }
 
     private void respondWith(StatusCode statusCode, String responseMessage, HttpServerRequest request) {
