@@ -60,6 +60,7 @@ if(!project.hasProperty('snapshotRepository')) {
 }
 
 repositories {
+    mavenLocal()
     try {
         maven { url "$repository" }
         println 'use custom repository: ' + "$repository"
