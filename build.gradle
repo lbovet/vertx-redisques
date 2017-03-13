@@ -245,7 +245,6 @@ release {
         pushToRemote = 'origin'
     }
 }
-beforeReleaseBuild.dependsOn test
 afterReleaseBuild.dependsOn uploadArchives
 
 nexusStaging {
