@@ -245,8 +245,8 @@ release {
         pushToRemote = 'origin'
     }
 }
-//beforeReleaseBuild.dependsOn build, test
-//afterReleaseBuild.dependsOn uploadArchives
+beforeReleaseBuild.dependsOn test
+afterReleaseBuild.dependsOn uploadArchives
 
 nexusStaging {
     packageGroup = "org.swisspush.redisques"
