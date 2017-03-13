@@ -1,8 +1,37 @@
+buildscript {
+    repositories {
+        mavenLocal()
+        try {
+            maven {
+                url "$repository"
+            }
+        }catch(Exception e) {
+            maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+        }
+        try {
+            ivy {
+                url "$repository"
+                layout "maven"
+            }
+        }catch(Exception e) {
+            maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+        }
+    }
+    dependencies{
+        classpath "io.codearte.gradle.nexus:gradle-nexus-staging-plugin:0.5.3"
+    }
+}
+
+plugins {
+    id 'net.researchgate.release' version '2.4.0'
+}
+
 apply plugin: 'idea'
 apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'signing'
 apply plugin: 'jacoco'
+apply plugin: 'io.codearte.nexus-staging'
 
 archivesBaseName='redisques'
 
@@ -156,25 +185,71 @@ uploadArchives {
     repositories {
         mavenDeployer {
 
+            def snapRepository = project.hasProperty('snapshotRepository') ? project.getProperties().get('snapshotRepository') : null
+            def relRepository = project.hasProperty('uploadRepository') ? project.getProperties().get('uploadRepository') : null
+            def repoUsername = project.hasProperty('repoUsername') ? project.getProperties().get('repoUsername') : null
+            def repoPassword = project.hasProperty('repoPassword') ? project.getProperties().get('repoPassword') : null
+
             configuration = configurations.archives
 
-            repository(url: "$uploadRepository") {
-                authentication(userName: "$repoUsername", password: "$repoPassword")
+            if ( repoUsername == null || repoPassword == null || repoUsername == 'randomUsername' || repoPassword == 'randomPassword') {
+                repository(url: relRepository)
+                snapshotRepository(url: snapRepository)
+            }
+            else {
+                repository(url: relRepository) {
+                    authentication(userName: repoUsername, password: repoPassword)
+                    if (project.hasProperty('proxyHost')) {
+                        proxy(host: project.property('proxyHost'), port: Integer.valueOf(project.property('proxyPort')), type: 'https')
+                    }
+                }
+
+                snapshotRepository(url: snapRepository) {
+                    authentication(userName: repoUsername, password: repoPassword)
+                    if (project.hasProperty('proxyHost')) {
+                        proxy(host: project.property('proxyHost'), port: Integer.valueOf(project.property('proxyPort')), type: 'https')
+                    }
+                }
             }
 
-            snapshotRepository(url: "$snapshotRepository") {
-                authentication(userName: "$repoUsername", password: "$repoPassword")
-            }
-
-            if (project.property('uploadRepository').contains("sonatype")) {
+            println " > should I sign poms ..."
+            if (relRepository.toLowerCase().contains("sonatype") && snapRepository.toLowerCase().contains("sonatype")) {
+                println " > signing poms ..."
                 beforeDeployment { org.gradle.api.artifacts.maven.MavenDeployment deployment -> signing.signPom(deployment) }
             }
 
             configurePom(pom)
         }
     }
-    }
+}
 
+release {
+    failOnCommitNeeded = true
+    failOnPublishNeeded = true
+    failOnSnapshotDependencies = true
+    failOnUnversionedFiles = false
+    failOnUpdateNeeded = true
+    revertOnFail = true
+    preTagCommitMessage = '[Gradle Release Plugin] - pre tag commit: '
+    tagCommitMessage = '[Gradle Release Plugin] - creating tag: '
+    newVersionCommitMessage = '[Gradle Release Plugin] - new version commit: '
+    versionPropertyFile = 'gradle.properties'
+    buildTasks = ['build']
+    tagTemplate = 'v$version'
+    scmAdapters = [
+            net.researchgate.release.GitAdapter
+    ]
+    git {
+        requireBranch = 'master'
+        pushToRemote = 'origin'
+    }
+}
+beforeReleaseBuild.dependsOn build, test
+afterReleaseBuild.dependsOn uploadArchives
+
+nexusStaging {
+    packageGroup = "org.swisspush.redisques"
+}
 
 def configurePom(def pom) {
     pom.project {
