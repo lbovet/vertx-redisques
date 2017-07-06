@@ -19,12 +19,14 @@ public class RedisquesConfiguration {
     private String redisEncoding;
     private int checkInterval;
     private int processorTimeout;
+    private int processorDelay;
     private boolean httpRequestHandlerEnabled;
     private String httpRequestHandlerPrefix;
     private Integer httpRequestHandlerPort;
     private String httpRequestHandlerUserHeader;
 
     private static final int DEFAULT_CHECK_INTERVAL = 60; // 60s
+    private static final int DEFAULT_PROCESSOR_DELAY = 0;
 
     public static final String PROP_ADDRESS = "address";
     public static final String PROP_REDIS_PREFIX = "redis-prefix";
@@ -35,16 +37,15 @@ public class RedisquesConfiguration {
     public static final String PROP_REDIS_ENCODING = "redisEncoding";
     public static final String PROP_CHECK_INTERVAL = "checkInterval";
     public static final String PROP_PROCESSOR_TIMEOUT = "processorTimeout";
+    public static final String PROP_PROCESSOR_DELAY = "processorDelay";
     public static final String PROP_HTTP_REQUEST_HANDLER_ENABLED = "httpRequestHandlerEnabled";
     public static final String PROP_HTTP_REQUEST_HANDLER_PREFIX = "httpRequestHandlerPrefix";
     public static final String PROP_HTTP_REQUEST_HANDLER_PORT = "httpRequestHandlerPort";
     public static final String PROP_HTTP_REQUEST_HANDLER_USER_HEADER = "httpRequestHandlerUserHeader";
 
-    private Logger log = LoggerFactory.getLogger(RedisquesConfiguration.class);
-
     /**
      * Constructor with default values. Use the {@link RedisquesConfigurationBuilder} class
-     * for simplyfied custom configuration.
+     * for simplified custom configuration.
      */
     public RedisquesConfiguration(){
         this(new RedisquesConfigurationBuilder());
@@ -58,12 +59,23 @@ public class RedisquesConfiguration {
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
                                   String redisHost, int redisPort, String redisEncoding, int checkInterval, int processorTimeout) {
-        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, checkInterval, processorTimeout, false, "", null, null);
+        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, checkInterval,
+                processorTimeout, false, "", null, null);
     }
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
                                   String redisHost, int redisPort, String redisEncoding, int checkInterval,
                                   int processorTimeout, boolean httpRequestHandlerEnabled,
+                                  String httpRequestHandlerPrefix, Integer httpRequestHandlerPort,
+                                  String httpRequestHandlerUserHeader) {
+        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding,
+                checkInterval, processorTimeout, DEFAULT_PROCESSOR_DELAY, httpRequestHandlerEnabled, httpRequestHandlerPrefix,
+                httpRequestHandlerPort, httpRequestHandlerUserHeader);
+    }
+
+    public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
+                                  String redisHost, int redisPort, String redisEncoding, int checkInterval,
+                                  int processorTimeout, int processorDelay, boolean httpRequestHandlerEnabled,
                                   String httpRequestHandlerPrefix, Integer httpRequestHandlerPort,
                                   String httpRequestHandlerUserHeader) {
         this.address = address;
@@ -74,14 +86,24 @@ public class RedisquesConfiguration {
         this.redisPort = redisPort;
         this.redisEncoding = redisEncoding;
 
+        Logger log = LoggerFactory.getLogger(RedisquesConfiguration.class);
+
         if(checkInterval > 0){
             this.checkInterval = checkInterval;
         } else {
-            log.warn("Overriden checkInterval of " + checkInterval + "s is not valid. Using default value of " + DEFAULT_CHECK_INTERVAL + "s instead.");
+            log.warn("Overridden checkInterval of " + checkInterval + "s is not valid. Using default value of " + DEFAULT_CHECK_INTERVAL + "s instead.");
             this.checkInterval = DEFAULT_CHECK_INTERVAL;
         }
 
         this.processorTimeout = processorTimeout;
+
+        if(processorDelay >= 0){
+            this.processorDelay = processorDelay;
+        } else {
+            log.warn("Overridden processorDelay of " + processorDelay + " is not valid. Using default value of " + DEFAULT_PROCESSOR_DELAY + " instead.");
+            this.processorDelay = DEFAULT_PROCESSOR_DELAY;
+        }
+
         this.httpRequestHandlerEnabled = httpRequestHandlerEnabled;
         this.httpRequestHandlerPrefix = httpRequestHandlerPrefix;
         this.httpRequestHandlerPort = httpRequestHandlerPort;
@@ -95,7 +117,7 @@ public class RedisquesConfiguration {
     private RedisquesConfiguration(RedisquesConfigurationBuilder builder){
         this(builder.address, builder.redisPrefix, builder.processorAddress, builder.refreshPeriod,
                 builder.redisHost, builder.redisPort, builder.redisEncoding, builder.checkInterval,
-                builder.processorTimeout, builder.httpRequestHandlerEnabled, builder.httpRequestHandlerPrefix,
+                builder.processorTimeout, builder.processorDelay, builder.httpRequestHandlerEnabled, builder.httpRequestHandlerPrefix,
                 builder.httpRequestHandlerPort, builder.httpRequestHandlerUserHeader);
     }
 
@@ -110,6 +132,7 @@ public class RedisquesConfiguration {
         obj.put(PROP_REDIS_ENCODING, getRedisEncoding());
         obj.put(PROP_CHECK_INTERVAL, getCheckInterval());
         obj.put(PROP_PROCESSOR_TIMEOUT, getProcessorTimeout());
+        obj.put(PROP_PROCESSOR_DELAY, getProcessorDelay());
         obj.put(PROP_HTTP_REQUEST_HANDLER_ENABLED, getHttpRequestHandlerEnabled());
         obj.put(PROP_HTTP_REQUEST_HANDLER_PREFIX, getHttpRequestHandlerPrefix());
         obj.put(PROP_HTTP_REQUEST_HANDLER_PORT, getHttpRequestHandlerPort());
@@ -145,6 +168,9 @@ public class RedisquesConfiguration {
         }
         if(json.containsKey(PROP_PROCESSOR_TIMEOUT)){
             builder.processorTimeout(json.getInteger(PROP_PROCESSOR_TIMEOUT));
+        }
+        if(json.containsKey(PROP_PROCESSOR_DELAY)){
+            builder.processorDelay(json.getInteger(PROP_PROCESSOR_DELAY));
         }
         if(json.containsKey(PROP_HTTP_REQUEST_HANDLER_ENABLED)){
             builder.httpRequestHandlerEnabled(json.getBoolean(PROP_HTTP_REQUEST_HANDLER_ENABLED));
@@ -187,6 +213,8 @@ public class RedisquesConfiguration {
 
     public int getProcessorTimeout() { return processorTimeout; }
 
+    public int getProcessorDelay() { return processorDelay; }
+
     public boolean getHttpRequestHandlerEnabled() { return  httpRequestHandlerEnabled; }
 
     public String getHttpRequestHandlerPrefix() { return httpRequestHandlerPrefix; }
@@ -214,7 +242,7 @@ public class RedisquesConfiguration {
     }
 
     /**
-     * RedisquesConfigurationBuilder class for simplyfied configuration.
+     * RedisquesConfigurationBuilder class for simplified configuration.
      *
      * <pre>Usage:</pre>
      * <pre>
@@ -234,6 +262,7 @@ public class RedisquesConfiguration {
         private String redisEncoding;
         private int checkInterval;
         private int processorTimeout;
+        private int processorDelay;
         private boolean httpRequestHandlerEnabled;
         private String httpRequestHandlerPrefix;
         private Integer httpRequestHandlerPort;
@@ -249,6 +278,7 @@ public class RedisquesConfiguration {
             this.redisEncoding = "UTF-8";
             this.checkInterval = DEFAULT_CHECK_INTERVAL; //60s
             this.processorTimeout = 240000;
+            this.processorDelay = 0;
             this.httpRequestHandlerEnabled = false;
             this.httpRequestHandlerPrefix = "/queuing";
             this.httpRequestHandlerPort = 7070;
@@ -297,6 +327,11 @@ public class RedisquesConfiguration {
 
         public RedisquesConfigurationBuilder processorTimeout(int processorTimeout){
             this.processorTimeout = processorTimeout;
+            return this;
+        }
+
+        public RedisquesConfigurationBuilder processorDelay(int processorDelay){
+            this.processorDelay = processorDelay;
             return this;
         }
 

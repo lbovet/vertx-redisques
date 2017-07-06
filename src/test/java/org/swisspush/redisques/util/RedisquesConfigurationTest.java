@@ -28,6 +28,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRedisEncoding(), "UTF-8");
         testContext.assertEquals(config.getCheckInterval(), 60);
         testContext.assertEquals(config.getProcessorTimeout(), 240000);
+        testContext.assertEquals(config.getProcessorDelay(), 0);
         testContext.assertFalse(config.getHttpRequestHandlerEnabled());
         testContext.assertEquals(config.getHttpRequestHandlerPrefix(), "/queuing");
         testContext.assertEquals(config.getHttpRequestHandlerPort(), 7070);
@@ -42,6 +43,7 @@ public class RedisquesConfigurationTest {
                 .redisPort(1234)
                 .checkInterval(5)
                 .processorTimeout(10)
+                .processorDelay(50)
                 .httpRequestHandlerEnabled(true)
                 .httpRequestHandlerPrefix("/queuing/test")
                 .httpRequestHandlerPort(7171)
@@ -54,12 +56,13 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRefreshPeriod(), 10);
         testContext.assertEquals(config.getRedisEncoding(), "UTF-8");
 
-        // overriden values
+        // overridden values
         testContext.assertEquals(config.getAddress(), "new_address");
         testContext.assertEquals(config.getRedisHost(), "anotherhost");
         testContext.assertEquals(config.getRedisPort(), 1234);
         testContext.assertEquals(config.getCheckInterval(), 5);
         testContext.assertEquals(config.getProcessorTimeout(), 10);
+        testContext.assertEquals(config.getProcessorDelay(), 50);
         testContext.assertTrue(config.getHttpRequestHandlerEnabled());
         testContext.assertEquals(config.getHttpRequestHandlerPrefix(), "/queuing/test");
         testContext.assertEquals(config.getHttpRequestHandlerPort(), 7171);
@@ -80,6 +83,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(json.getString(PROP_REDIS_ENCODING), "UTF-8");
         testContext.assertEquals(json.getInteger(PROP_CHECK_INTERVAL), 60);
         testContext.assertEquals(json.getInteger(PROP_PROCESSOR_TIMEOUT), 240000);
+        testContext.assertEquals(json.getInteger(PROP_PROCESSOR_DELAY), 0);
         testContext.assertFalse(json.getBoolean(PROP_HTTP_REQUEST_HANDLER_ENABLED));
         testContext.assertEquals(json.getString(PROP_HTTP_REQUEST_HANDLER_PREFIX), "/queuing");
         testContext.assertEquals(json.getInteger(PROP_HTTP_REQUEST_HANDLER_PORT), 7070);
@@ -87,7 +91,7 @@ public class RedisquesConfigurationTest {
     }
 
     @Test
-    public void testGetOverridenAsJsonObject(TestContext testContext){
+    public void testGetOverriddenAsJsonObject(TestContext testContext){
 
         RedisquesConfiguration config = with()
                 .address("new_address")
@@ -95,6 +99,7 @@ public class RedisquesConfigurationTest {
                 .redisPort(1234)
                 .checkInterval(5)
                 .processorTimeout(20)
+                .processorDelay(50)
                 .httpRequestHandlerPort(7171)
                 .httpRequestHandlerUserHeader("x-custom-user-header")
                 .build();
@@ -109,12 +114,13 @@ public class RedisquesConfigurationTest {
         testContext.assertFalse(json.getBoolean(PROP_HTTP_REQUEST_HANDLER_ENABLED));
         testContext.assertEquals(json.getString(PROP_HTTP_REQUEST_HANDLER_PREFIX), "/queuing");
 
-        // overriden values
+        // overridden values
         testContext.assertEquals(json.getString(PROP_ADDRESS), "new_address");
         testContext.assertEquals(json.getString(PROP_REDIS_HOST), "anotherhost");
         testContext.assertEquals(json.getInteger(PROP_REDIS_PORT), 1234);
         testContext.assertEquals(json.getInteger(PROP_CHECK_INTERVAL), 5);
         testContext.assertEquals(json.getInteger(PROP_PROCESSOR_TIMEOUT), 20);
+        testContext.assertEquals(json.getInteger(PROP_PROCESSOR_DELAY), 50);
         testContext.assertEquals(json.getInteger(PROP_HTTP_REQUEST_HANDLER_PORT), 7171);
         testContext.assertEquals(json.getString(PROP_HTTP_REQUEST_HANDLER_USER_HEADER), "x-custom-user-header");
     }
@@ -133,6 +139,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRedisEncoding(), "UTF-8");
         testContext.assertEquals(config.getCheckInterval(), 60);
         testContext.assertEquals(config.getProcessorTimeout(), 240000);
+        testContext.assertEquals(config.getProcessorDelay(), 0);
         testContext.assertFalse(config.getHttpRequestHandlerEnabled());
         testContext.assertEquals(config.getHttpRequestHandlerPrefix(), "/queuing");
         testContext.assertEquals(config.getHttpRequestHandlerPort(), 7070);
@@ -140,7 +147,7 @@ public class RedisquesConfigurationTest {
     }
 
     @Test
-    public void testGetOverridenFromJsonObject(TestContext testContext){
+    public void testGetOverriddenFromJsonObject(TestContext testContext){
 
         JsonObject json = new JsonObject();
         json.put(PROP_ADDRESS, "new_address");
@@ -152,6 +159,7 @@ public class RedisquesConfigurationTest {
         json.put(PROP_REDIS_ENCODING, "new_encoding");
         json.put(PROP_CHECK_INTERVAL, 5);
         json.put(PROP_PROCESSOR_TIMEOUT, 30);
+        json.put(PROP_PROCESSOR_DELAY, 99);
         json.put(PROP_HTTP_REQUEST_HANDLER_ENABLED, Boolean.TRUE);
         json.put(PROP_HTTP_REQUEST_HANDLER_PREFIX, "/queuing/test123");
         json.put(PROP_HTTP_REQUEST_HANDLER_PORT, 7171);
@@ -167,10 +175,29 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRedisEncoding(), "new_encoding");
         testContext.assertEquals(config.getCheckInterval(), 5);
         testContext.assertEquals(config.getProcessorTimeout(), 30);
+        testContext.assertEquals(config.getProcessorDelay(), 99);
         testContext.assertTrue(config.getHttpRequestHandlerEnabled());
         testContext.assertEquals(config.getHttpRequestHandlerPort(), 7171);
         testContext.assertEquals(config.getHttpRequestHandlerPrefix(), "/queuing/test123");
         testContext.assertEquals(config.getHttpRequestHandlerUserHeader(), "x-custom-user-header");
+    }
+
+    @Test
+    public void testProcessorDelay(TestContext testContext){
+        RedisquesConfiguration config = with().processorDelay(5).build();
+        testContext.assertEquals(5, config.getProcessorDelay());
+
+        config = with().processorDelay(0).build();
+        testContext.assertEquals(0, config.getProcessorDelay());
+
+        // test negative value
+        config = with().processorDelay(-50).build();
+        testContext.assertEquals(0, config.getProcessorDelay());
+        config = with().processorDelay(Integer.MIN_VALUE).build();
+        testContext.assertEquals(0, config.getProcessorDelay());
+
+        config = with().processorDelay(Integer.MAX_VALUE).build();
+        testContext.assertEquals(Integer.MAX_VALUE, config.getProcessorDelay());
     }
 
     @Test

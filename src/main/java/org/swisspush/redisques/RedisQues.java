@@ -59,15 +59,25 @@ public class RedisQues extends AbstractVerticle {
     // Prefix for redis keys holding queues and consumers.
     private String redisPrefix = "redisques:";
 
-    private String getQueuesPrefix() { return redisPrefix + "queues:"; }
+    private String getQueuesPrefix() {
+        return redisPrefix + "queues:";
+    }
 
-    private String getQueuesKey() { return redisPrefix + "queues"; }
+    private String getQueuesKey() {
+        return redisPrefix + "queues";
+    }
 
-    public String getConsumersPrefix() { return redisPrefix + "consumers:"; }
+    public String getConsumersPrefix() {
+        return redisPrefix + "consumers:";
+    }
 
-    private String getLocksKey() { return redisPrefix + "locks"; }
+    private String getLocksKey() {
+        return redisPrefix + "locks";
+    }
 
-    private String getQueueCheckLastexecKey() { return redisPrefix + "check:lastexec"; }
+    private String getQueueCheckLastexecKey() {
+        return redisPrefix + "check:lastexec";
+    }
 
     // Address of message processors
     private String processorAddress = "redisques-processor";
@@ -144,7 +154,7 @@ public class RedisQues extends AbstractVerticle {
             }
 
             QueueOperation queueOperation = QueueOperation.fromString(operation);
-            if(queueOperation == null){
+            if (queueOperation == null) {
                 unsupportedOperation(operation, event);
                 return;
             }
@@ -181,7 +191,7 @@ public class RedisQues extends AbstractVerticle {
                     putLock(event);
                     break;
                 case getLock:
-                    redisClient.hget(getLocksKey(), event.body().getJsonObject(PAYLOAD).getString(QUEUENAME),new GetLockHandler(event));
+                    redisClient.hget(getLocksKey(), event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), new GetLockHandler(event));
                     break;
                 case deleteLock:
                     deleteLock(event);
@@ -249,13 +259,13 @@ public class RedisQues extends AbstractVerticle {
         registerQueueCheck(modConfig);
     }
 
-    private void enqueue(Message<JsonObject> event){
+    private void enqueue(Message<JsonObject> event) {
         updateTimestamp(event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), null);
         String keyEnqueue = getQueuesPrefix() + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
         String valueEnqueue = event.body().getString(MESSAGE);
         redisClient.rpush(keyEnqueue, valueEnqueue, event2 -> {
             JsonObject reply = new JsonObject();
-            if(event2.succeeded()){
+            if (event2.succeeded()) {
                 log.debug("RedisQues Enqueued message into queue " + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME));
                 notifyConsumer(event.body().getJsonObject(PAYLOAD).getString(QUEUENAME));
                 reply.put(STATUS, OK);
@@ -271,13 +281,13 @@ public class RedisQues extends AbstractVerticle {
         });
     }
 
-    private void lockedEnqueue(Message<JsonObject> event){
+    private void lockedEnqueue(Message<JsonObject> event) {
         log.debug("RedisQues about to lockedEnqueue");
         JsonObject lockInfo = extractLockInfo(event.body().getJsonObject(PAYLOAD).getString(REQUESTED_BY));
         if (lockInfo != null) {
             redisClient.hmset(getLocksKey(), new JsonObject().put(event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), lockInfo.encode()),
                     putLockResult -> {
-                        if(putLockResult.succeeded()){
+                        if (putLockResult.succeeded()) {
                             log.debug("RedisQues lockedEnqueue locking successful, now going to enqueue");
                             enqueue(event);
                         } else {
@@ -286,42 +296,42 @@ public class RedisQues extends AbstractVerticle {
                         }
                     });
         } else {
-            log.warn("RedisQues lockedEnqueue failed because property '"+REQUESTED_BY+"' was missing");
+            log.warn("RedisQues lockedEnqueue failed because property '" + REQUESTED_BY + "' was missing");
             event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, "Property '" + REQUESTED_BY + "' missing"));
         }
 
     }
 
-    private void addQueueItem(Message<JsonObject> event){
+    private void addQueueItem(Message<JsonObject> event) {
         String key1 = getQueuesPrefix() + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
         String valueAddItem = event.body().getJsonObject(PAYLOAD).getString(BUFFER);
         redisClient.rpush(key1, valueAddItem, new AddQueueItemHandler(event));
     }
 
-    private void getQueueItems(Message<JsonObject> event){
+    private void getQueueItems(Message<JsonObject> event) {
         String keyListRange = getQueuesPrefix() + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
         int maxQueueItemCountIndex = getMaxQueueItemCountIndex(event.body().getJsonObject(PAYLOAD).getString(LIMIT));
         redisClient.llen(keyListRange, countReply -> redisClient.lrange(keyListRange, 0, maxQueueItemCountIndex, new GetQueueItemsHandler(event, countReply.result())));
     }
 
-    private void getQueueItem(Message<JsonObject> event){
+    private void getQueueItem(Message<JsonObject> event) {
         String key = getQueuesPrefix() + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
         int index = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
         redisClient.lindex(key, index, new GetQueueItemHandler(event));
     }
 
-    private void replaceQueueItem(Message<JsonObject> event){
+    private void replaceQueueItem(Message<JsonObject> event) {
         String keyReplaceItem = getQueuesPrefix() + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
         int indexReplaceItem = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
         String bufferReplaceItem = event.body().getJsonObject(PAYLOAD).getString(BUFFER);
         redisClient.lset(keyReplaceItem, indexReplaceItem, bufferReplaceItem, new ReplaceQueueItemHandler(event));
     }
 
-    private void deleteQueueItem(Message<JsonObject> event){
+    private void deleteQueueItem(Message<JsonObject> event) {
         String keyLset = getQueuesPrefix() + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
         int indexLset = event.body().getJsonObject(PAYLOAD).getInteger(INDEX);
         redisClient.lset(keyLset, indexLset, "TO_DELETE", event1 -> {
-            if(event1.succeeded()){
+            if (event1.succeeded()) {
                 String keyLrem = getQueuesPrefix() + event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
                 redisClient.lrem(keyLrem, 0, "TO_DELETE", replyLrem -> event.reply(new JsonObject().put(STATUS, OK)));
             } else {
@@ -330,22 +340,20 @@ public class RedisQues extends AbstractVerticle {
         });
     }
 
-    private void deleteAllQueueItems(Message<JsonObject> event){
+    private void deleteAllQueueItems(Message<JsonObject> event) {
         JsonObject payload = event.body().getJsonObject(PAYLOAD);
         boolean unlock = payload.getBoolean(UNLOCK, false);
         String queue = payload.getString(QUEUENAME);
         redisClient.del(getQueuesPrefix() + queue, deleteReply -> {
-            if(unlock) {
-                redisClient.hdel(getLocksKey(), queue, unlockReply -> {
-                    replyDeleteAllQueueItems(event, deleteReply);
-                });
+            if (unlock) {
+                redisClient.hdel(getLocksKey(), queue, unlockReply -> replyDeleteAllQueueItems(event, deleteReply));
             } else {
                 replyDeleteAllQueueItems(event, deleteReply);
             }
         });
     }
 
-    private void replyDeleteAllQueueItems(Message<JsonObject> event, AsyncResult<Long> deleteReply){
+    private void replyDeleteAllQueueItems(Message<JsonObject> event, AsyncResult<Long> deleteReply) {
         if (deleteReply.result() > 0) {
             event.reply(new JsonObject().put(STATUS, OK));
         } else {
@@ -353,7 +361,7 @@ public class RedisQues extends AbstractVerticle {
         }
     }
 
-    private void putLock(Message<JsonObject> event){
+    private void putLock(Message<JsonObject> event) {
         JsonObject lockInfo = extractLockInfo(event.body().getJsonObject(PAYLOAD).getString(REQUESTED_BY));
         if (lockInfo != null) {
             redisClient.hmset(getLocksKey(), new JsonObject().put(event.body().getJsonObject(PAYLOAD).getString(QUEUENAME), lockInfo.encode()),
@@ -363,10 +371,10 @@ public class RedisQues extends AbstractVerticle {
         }
     }
 
-    private void deleteLock(Message<JsonObject> event){
+    private void deleteLock(Message<JsonObject> event) {
         String queueName = event.body().getJsonObject(PAYLOAD).getString(QUEUENAME);
         redisClient.exists(getQueuesPrefix() + queueName, event1 -> {
-            if(event1.succeeded() && event1.result() == 1){
+            if (event1.succeeded() && event1.result() == 1) {
                 notifyConsumer(queueName);
             }
             redisClient.hdel(getLocksKey(), queueName, new DeleteLockHandler(event));
@@ -374,21 +382,20 @@ public class RedisQues extends AbstractVerticle {
     }
 
     private void registerQueueCheck(RedisquesConfiguration modConfig) {
-        vertx.setPeriodic(modConfig.getCheckIntervalTimerMs(), periodicEvent -> {
-            luaScriptManager.handleQueueCheck(getQueueCheckLastexecKey(), checkInterval, shouldCheck -> {
-                if (shouldCheck) {
-                    log.info("periodic queue check is triggered now");
-                    checkQueues();
-                }
-            });
-        });
+        vertx.setPeriodic(modConfig.getCheckIntervalTimerMs(), periodicEvent -> luaScriptManager.handleQueueCheck(getQueueCheckLastexecKey(),
+                checkInterval, shouldCheck -> {
+                    if (shouldCheck) {
+                        log.info("periodic queue check is triggered now");
+                        checkQueues();
+                    }
+                }));
     }
 
-    private long getMaxAgeTimestamp(){
+    private long getMaxAgeTimestamp() {
         return System.currentTimeMillis() - MAX_AGE_MILLISECONDS;
     }
 
-    private void unsupportedOperation(String operation, Message<JsonObject> event){
+    private void unsupportedOperation(String operation, Message<JsonObject> event) {
         JsonObject reply = new JsonObject();
         String message = "QUEUE_ERROR: Unsupported operation received: " + operation;
         log.error(message);
@@ -465,12 +472,12 @@ public class RedisQues extends AbstractVerticle {
             log.trace("RedisQues reset consumers keys: " + keysPattern);
         }
         redisClient.keys(keysPattern, keysResult -> {
-            if(keysResult.failed()) {
+            if (keysResult.failed()) {
                 log.error("Unable to get redis keys of consumers");
                 return;
             }
             List keys = keysResult.result().getList();
-            if(keys == null || keys.size() < 1) {
+            if (keys == null || keys.size() < 1) {
                 log.debug("No consumers found to reset");
                 return;
             }
@@ -531,10 +538,10 @@ public class RedisQues extends AbstractVerticle {
     private Future<Boolean> isQueueLocked(final String queue) {
         Future<Boolean> future = Future.future();
         redisClient.hexists(getLocksKey(), queue, event -> {
-            if(event.failed()){
+            if (event.failed()) {
                 log.warn("failed to check if queue '" + queue + "' is locked. Message: " + event.cause().getMessage());
                 future.complete(Boolean.FALSE);
-            } else{
+            } else {
                 future.complete(event.result() == 1);
             }
         });
@@ -552,7 +559,7 @@ public class RedisQues extends AbstractVerticle {
 
         isQueueLocked(queue).setHandler(lockAnswer -> {
             boolean locked = lockAnswer.result();
-            if(!locked){
+            if (!locked) {
                 redisClient.lindex(key, 0, answer -> {
                     if (log.isTraceEnabled()) {
                         log.trace("RedisQues read queue lindex result: " + answer.result());
@@ -612,7 +619,7 @@ public class RedisQues extends AbstractVerticle {
     }
 
     private void rescheduleSendMessageAfterFailure(final String queue) {
-        if(log.isTraceEnabled()) {
+        if (log.isTraceEnabled()) {
             log.trace("RedsQues reschedule after failure for queue: " + queue);
         }
         vertx.setTimer(refreshPeriod * 1000, timerId -> notifyConsumer(queue));
@@ -636,7 +643,7 @@ public class RedisQues extends AbstractVerticle {
         // send the message to the consumer
         eb.send(processorAddress, message, (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
             Boolean success;
-            if(reply.succeeded()){
+            if (reply.succeeded()) {
                 success = OK.equals(reply.result().body().getString(STATUS));
             } else {
                 success = Boolean.FALSE;
@@ -692,14 +699,15 @@ public class RedisQues extends AbstractVerticle {
         if (handler != null) {
             redisClient.expire(key, 2 * refreshPeriod, handler);
         } else {
-            redisClient.expire(key, 2 * refreshPeriod, event -> {});
+            redisClient.expire(key, 2 * refreshPeriod, event -> {
+            });
         }
     }
 
     /**
      * Stores the queue name in a sorted set with the current date as score.
      *
-     * @param queue the name of the queue
+     * @param queue   the name of the queue
      * @param handler (optional) To get informed when done.
      */
     private void updateTimestamp(final String queue, Handler<AsyncResult<Long>> handler) {
@@ -710,7 +718,8 @@ public class RedisQues extends AbstractVerticle {
         if (handler != null) {
             redisClient.zadd(getQueuesKey(), ts, queue, handler);
         } else {
-            redisClient.zadd(getQueuesKey(), ts, queue, event -> {});
+            redisClient.zadd(getQueuesKey(), ts, queue, event -> {
+            });
         }
     }
 
@@ -771,7 +780,8 @@ public class RedisQues extends AbstractVerticle {
      */
     private void removeOldQueues(long limit) {
         log.debug("Cleaning old queues");
-        redisClient.zremrangebyscore(getQueuesKey(), "-inf", String.valueOf(limit), event -> {});
+        redisClient.zremrangebyscore(getQueuesKey(), "-inf", String.valueOf(limit), event -> {
+        });
     }
 
     private int getMaxQueueItemCountIndex(String limit) {

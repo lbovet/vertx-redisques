@@ -61,7 +61,7 @@ The following configuration values are available:
 
 ### Configuration util
 
-The configurations have to be passed as JsonObject to the module. For a simplyfied configuration the _RedisquesConfigurationBuilder_ can be used.
+The configurations have to be passed as JsonObject to the module. For a simplified configuration the _RedisquesConfigurationBuilder_ can be used.
 
 Example:
 
@@ -74,7 +74,7 @@ RedisquesConfiguration config = RedisquesConfiguration.with()
 JsonObject json = config.asJsonObject();
 ```
 
-Properties not overriden will not be changed. Thus remaining default.
+Properties not overridden will not be changed. Thus remaining default.
 
 To use default values only, the _RedisquesConfiguration_ constructor without parameters can be used:
 
@@ -91,7 +91,7 @@ Redisques API for Vert.x - Eventbus
 > address = redisque
 
 ### RedisquesAPI util
-For a simplyfied working with the Redisques module, see the RedisquesAPI class:
+For a simplified working with the Redisques module, see the RedisquesAPI class:
 
 > org.swisspush.redisques.util.RedisquesAPI
 
