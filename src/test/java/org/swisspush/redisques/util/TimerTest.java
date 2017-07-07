@@ -22,12 +22,11 @@ public class TimerTest {
         final int delayMs = 1500;
         final long start = System.currentTimeMillis();
 
-        timer.executeDelayed(delayMs).setHandler(delayed -> {
+        timer.executeDelayedMax(delayMs).setHandler(delayed -> {
             context.assertTrue(delayed.succeeded());
 
             long end = System.currentTimeMillis();
             long duration = end - start;
-            assertDuration(context, duration, delayMs);
             assertMaxDuration(context, duration, delayMs);
             async.complete();
         });
@@ -40,12 +39,11 @@ public class TimerTest {
         final int delayMs = 10;
         final long start = System.currentTimeMillis();
 
-        timer.executeDelayed(delayMs).setHandler(delayed -> {
+        timer.executeDelayedMax(delayMs).setHandler(delayed -> {
             context.assertTrue(delayed.succeeded());
 
             long end = System.currentTimeMillis();
             long duration = end - start;
-            assertDuration(context, duration, delayMs);
             assertMaxDuration(context, duration, delayMs);
             async.complete();
         });
@@ -58,20 +56,14 @@ public class TimerTest {
         final int delayMs = 0;
         final long start = System.currentTimeMillis();
 
-        timer.executeDelayed(delayMs).setHandler(delayed -> {
+        timer.executeDelayedMax(delayMs).setHandler(delayed -> {
             context.assertTrue(delayed.succeeded());
 
             long end = System.currentTimeMillis();
             long duration = end - start;
-            assertDuration(context, duration, delayMs);
             assertMaxDuration(context, duration, delayMs);
             async.complete();
         });
-    }
-
-    private void assertDuration(TestContext context, long duration, int delayMs){
-        context.assertTrue(duration >= delayMs, "Future completed after " + duration + "ms. " +
-                "This should be greater or equal than the delay of " + delayMs + "ms");
     }
 
     private void assertMaxDuration(TestContext context, long duration, int delayMs){

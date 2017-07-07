@@ -632,7 +632,7 @@ public class RedisQues extends AbstractVerticle {
     }
 
     private void processMessageWithTimeout(final String queue, final String payload, final Handler<SendResult> handler) {
-        timer.executeDelayed(processorDelayMs).setHandler(delayed -> {
+        timer.executeDelayedMax(processorDelayMs).setHandler(delayed -> {
             if(delayed.failed()){
                 log.error("Delayed execution has failed. Cause: " + delayed.cause().getMessage());
                 return;

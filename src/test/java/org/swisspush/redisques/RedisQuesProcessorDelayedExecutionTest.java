@@ -22,7 +22,7 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.swisspush.redisques.util.RedisquesAPI.*;
 
 /**
- * Created by florian kammermann on 31.05.2016.
+ * @author https://github.com/mcweba [Marc-Andre Weber]
  */
 public class RedisQuesProcessorDelayedExecutionTest extends AbstractTestCase {
 
@@ -87,7 +87,6 @@ public class RedisQuesProcessorDelayedExecutionTest extends AbstractTestCase {
 
         queueProcessor.handler(event -> {
             long duration = System.currentTimeMillis() - start;
-            context.assertTrue(duration > 1499, "QueueProcessor should have been called not before 1500ms");
             context.assertTrue(duration < 1600, "QueueProcessor should have been called at the latest after 1600ms");
             processorCalled.set(true);
         });
