@@ -17,6 +17,7 @@ import io.vertx.redis.op.RangeLimitOptions;
 import org.swisspush.redisques.handler.*;
 import org.swisspush.redisques.lua.LuaScriptManager;
 import org.swisspush.redisques.util.RedisquesConfiguration;
+import org.swisspush.redisques.util.Timer;
 
 import java.util.HashMap;
 import java.util.List;
@@ -93,6 +94,9 @@ public class RedisQues extends AbstractVerticle {
     // the time we wait for the processor to answer, before we cancel processing
     private int processorTimeout = 240000;
 
+    private int processorDelayMs;
+    private Timer timer;
+
     private static final int DEFAULT_MAX_QUEUEITEM_COUNT = 49;
     private static final int MAX_AGE_MILLISECONDS = 120000; // 120 seconds
 
@@ -136,6 +140,8 @@ public class RedisQues extends AbstractVerticle {
         refreshPeriod = modConfig.getRefreshPeriod();
         checkInterval = modConfig.getCheckInterval();
         processorTimeout = modConfig.getProcessorTimeout();
+        processorDelayMs = modConfig.getProcessorDelay();
+        timer = new Timer(vertx);
 
         this.redisClient = RedisClient.create(vertx, new RedisOptions()
                 .setHost(modConfig.getRedisHost())
@@ -626,31 +632,37 @@ public class RedisQues extends AbstractVerticle {
     }
 
     private void processMessageWithTimeout(final String queue, final String payload, final Handler<SendResult> handler) {
-        final EventBus eb = vertx.eventBus();
-        JsonObject message = new JsonObject();
-        message.put("queue", queue);
-        message.put(PAYLOAD, payload);
-        if (log.isTraceEnabled()) {
-            log.trace("RedisQues process message: " + message + " for queue: " + queue + " send it to processor: " + processorAddress);
-        }
-
-        // start a timer, which will cancel the processing, if the consumer didn't respond
-        final long timeoutId = vertx.setTimer(processorTimeout, timeoutId1 -> {
-            log.info("RedisQues QUEUE_ERROR: Consumer timeout " + uid + " queue: " + queue);
-            handler.handle(new SendResult(false, timeoutId1));
-        });
-
-        // send the message to the consumer
-        eb.send(processorAddress, message, (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
-            Boolean success;
-            if (reply.succeeded()) {
-                success = OK.equals(reply.result().body().getString(STATUS));
-            } else {
-                success = Boolean.FALSE;
+        timer.executeDelayed(processorDelayMs).setHandler(delayed -> {
+            if(delayed.failed()){
+                log.error("Delayed execution has failed. Cause: " + delayed.cause().getMessage());
+                return;
             }
-            handler.handle(new SendResult(success, timeoutId));
+            final EventBus eb = vertx.eventBus();
+            JsonObject message = new JsonObject();
+            message.put("queue", queue);
+            message.put(PAYLOAD, payload);
+            if (log.isTraceEnabled()) {
+                log.trace("RedisQues process message: " + message + " for queue: " + queue + " send it to processor: " + processorAddress);
+            }
+
+            // start a timer, which will cancel the processing, if the consumer didn't respond
+            final long timeoutId = vertx.setTimer(processorTimeout, timeoutId1 -> {
+                log.info("RedisQues QUEUE_ERROR: Consumer timeout " + uid + " queue: " + queue);
+                handler.handle(new SendResult(false, timeoutId1));
+            });
+
+            // send the message to the consumer
+            eb.send(processorAddress, message, (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+                Boolean success;
+                if (reply.succeeded()) {
+                    success = OK.equals(reply.result().body().getString(STATUS));
+                } else {
+                    success = Boolean.FALSE;
+                }
+                handler.handle(new SendResult(success, timeoutId));
+            });
+            updateTimestamp(queue, null);
         });
-        updateTimestamp(queue, null);
     }
 
     private class SendResult {
