@@ -97,6 +97,15 @@ public class RedisQues extends AbstractVerticle {
     private int processorDelayMax;
     private Timer timer;
 
+    private String redisHost;
+    private int redisPort;
+    private String redisEncoding;
+
+    private boolean httpRequestHandlerEnabled;
+    private String httpRequestHandlerPrefix;
+    private int httpRequestHandlerPort;
+    private String httpRequestHandlerUserHeader;
+
     private static final int DEFAULT_MAX_QUEUEITEM_COUNT = 49;
     private static final int MAX_AGE_MILLISECONDS = 120000; // 120 seconds
 
@@ -143,10 +152,19 @@ public class RedisQues extends AbstractVerticle {
         processorDelayMax = modConfig.getProcessorDelayMax();
         timer = new Timer(vertx);
 
+        redisHost = modConfig.getRedisHost();
+        redisPort = modConfig.getRedisPort();
+        redisEncoding = modConfig.getRedisEncoding();
+
+        httpRequestHandlerEnabled = modConfig.getHttpRequestHandlerEnabled();
+        httpRequestHandlerPrefix = modConfig.getHttpRequestHandlerPrefix();
+        httpRequestHandlerPort = modConfig.getHttpRequestHandlerPort();
+        httpRequestHandlerUserHeader = modConfig.getHttpRequestHandlerUserHeader();
+
         this.redisClient = RedisClient.create(vertx, new RedisOptions()
-                .setHost(modConfig.getRedisHost())
-                .setPort(modConfig.getRedisPort())
-                .setEncoding(modConfig.getRedisEncoding()));
+                .setHost(redisHost)
+                .setPort(redisPort)
+                .setEncoding(redisEncoding));
 
         this.luaScriptManager = new LuaScriptManager(redisClient);
 
@@ -222,6 +240,9 @@ public class RedisQues extends AbstractVerticle {
                         JsonObject reply = new JsonObject();
                         reply.put(STATUS, OK);
                     });
+                    break;
+                case getConfiguration:
+                    getConfiguration(event);
                     break;
                 default:
                     unsupportedOperation(operation, event);
@@ -385,6 +406,25 @@ public class RedisQues extends AbstractVerticle {
             }
             redisClient.hdel(getLocksKey(), queueName, new DeleteLockHandler(event));
         });
+    }
+
+    private void getConfiguration(Message<JsonObject> event) {
+        JsonObject result = new JsonObject();
+        result.put(RedisquesConfiguration.PROP_ADDRESS, address);
+        result.put(RedisquesConfiguration.PROP_REDIS_PREFIX, redisPrefix);
+        result.put(RedisquesConfiguration.PROP_PROCESSOR_ADDRESS, processorAddress);
+        result.put(RedisquesConfiguration.PROP_REFRESH_PERIOD, refreshPeriod);
+        result.put(RedisquesConfiguration.PROP_REDIS_HOST, redisHost);
+        result.put(RedisquesConfiguration.PROP_REDIS_PORT, redisPort);
+        result.put(RedisquesConfiguration.PROP_REDIS_ENCODING, redisEncoding);
+        result.put(RedisquesConfiguration.PROP_CHECK_INTERVAL, checkInterval);
+        result.put(RedisquesConfiguration.PROP_PROCESSOR_TIMEOUT, processorTimeout);
+        result.put(RedisquesConfiguration.PROP_PROCESSOR_DELAY_MAX, processorDelayMax);
+        result.put(RedisquesConfiguration.PROP_HTTP_REQUEST_HANDLER_ENABLED, httpRequestHandlerEnabled);
+        result.put(RedisquesConfiguration.PROP_HTTP_REQUEST_HANDLER_PREFIX, httpRequestHandlerPrefix);
+        result.put(RedisquesConfiguration.PROP_HTTP_REQUEST_HANDLER_PORT, httpRequestHandlerPort);
+        result.put(RedisquesConfiguration.PROP_HTTP_REQUEST_HANDLER_USER_HEADER, httpRequestHandlerUserHeader);
+        event.reply(new JsonObject().put(STATUS, OK).put(VALUE, result));
     }
 
     private void registerQueueCheck(RedisquesConfiguration modConfig) {

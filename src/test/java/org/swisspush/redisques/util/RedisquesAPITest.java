@@ -91,6 +91,7 @@ public class RedisquesAPITest {
         context.assertFalse(QueueOperation.getQueues.hasLegacyName());
         context.assertFalse(QueueOperation.getQueuesCount.hasLegacyName());
         context.assertFalse(QueueOperation.getQueueItemsCount.hasLegacyName());
+        context.assertFalse(QueueOperation.getConfiguration.hasLegacyName());
     }
 
     @Test
@@ -184,7 +185,6 @@ public class RedisquesAPITest {
         context.assertEquals(buildExpectedJsonObject("getQueuesCount"), operation);
     }
 
-
     @Test
     public void testBuildGetQueueItemsCountOperation(TestContext context) throws Exception {
         JsonObject operation = RedisquesAPI.buildGetQueueItemsCountOperation("my_queue_name");
@@ -228,6 +228,12 @@ public class RedisquesAPITest {
     public void testBuildCheckOperation(TestContext context) throws Exception {
         JsonObject operation = RedisquesAPI.buildCheckOperation();
         context.assertEquals(buildExpectedJsonObject("check"), operation);
+    }
+
+    @Test
+    public void testBuildGetConfigurationOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildGetConfigurationOperation();
+        context.assertEquals(buildExpectedJsonObject("getConfiguration"), operation);
     }
 
     private JsonObject buildExpectedJsonObject(String operation){

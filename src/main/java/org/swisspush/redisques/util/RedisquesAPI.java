@@ -31,6 +31,7 @@ public class RedisquesAPI {
     public enum QueueOperation {
         enqueue(null),
         lockedEnqueue(null),
+        getConfiguration(null),
         check(null),
         reset(null),
         stop(null),
@@ -86,6 +87,8 @@ public class RedisquesAPI {
         op.put(PAYLOAD, payload);
         return op;
     }
+
+    public static JsonObject buildGetConfigurationOperation() { return buildOperation(QueueOperation.getConfiguration); }
 
     public static JsonObject buildCheckOperation(){
         return buildOperation(QueueOperation.check);

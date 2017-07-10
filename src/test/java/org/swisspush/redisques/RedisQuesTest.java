@@ -57,6 +57,36 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
+    public void getConfiguration(TestContext context) {
+        Async async = context.async();
+        eventBusSend(buildGetConfigurationOperation(), message -> {
+            context.assertEquals(OK, message.result().body().getString(STATUS));
+            JsonObject configuration = message.result().body().getJsonObject(VALUE);
+            context.assertNotNull(configuration);
+
+            context.assertEquals(configuration.getString("address"), "redisques");
+            context.assertEquals(configuration.getString("processor-address"), "processor-address");
+
+            context.assertEquals(configuration.getString("redisHost"), "localhost");
+            context.assertEquals(configuration.getInteger("redisPort"), 6379);
+            context.assertEquals(configuration.getString("redis-prefix"), "redisques:");
+            context.assertEquals(configuration.getString("redisEncoding"), "ISO-8859-1");
+
+            context.assertEquals(configuration.getInteger("checkInterval"), 60);
+            context.assertEquals(configuration.getInteger("refresh-period"), 2);
+            context.assertEquals(configuration.getInteger("processorTimeout"), 240000);
+            context.assertEquals(configuration.getInteger("processorDelayMax"), 0);
+
+            context.assertFalse(configuration.getBoolean("httpRequestHandlerEnabled"));
+            context.assertEquals(configuration.getInteger("httpRequestHandlerPort"), 7070);
+            context.assertEquals(configuration.getString("httpRequestHandlerPrefix"), "/queuing");
+            context.assertEquals(configuration.getString("httpRequestHandlerUserHeader"), "x-rp-usr");
+
+            async.complete();
+        });
+    }
+
+    @Test
     public void enqueue(TestContext context) {
         Async async = context.async();
         flushAll();

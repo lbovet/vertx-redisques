@@ -79,6 +79,11 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         router.get(prefix + "/").handler(this::listEndpoints);
 
         /*
+         * Get configuration
+         */
+        router.get(prefix + "/configuration/").handler(this::getConfiguration);
+
+        /*
          * Get monitor information
          */
         router.get(prefix + "/monitor/").handler(this::getMonitorInformation);
@@ -166,6 +171,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         items.add("locks/");
         items.add("queues/");
         items.add("monitor/");
+        items.add("configuration/");
         result.put(lastPart(ctx.request().path()), items);
         ctx.response().putHeader(CONTENT_TYPE, APPLICATION_JSON);
         ctx.response().end(result.encode());
@@ -250,6 +256,18 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
                 jsonResponse(ctx.response(), result);
             } else {
                 respondWith(StatusCode.INTERNAL_SERVER_ERROR, "Error gathering count of active queue items", ctx.request());
+            }
+        });
+    }
+
+    private void getConfiguration(RoutingContext ctx){
+        eventBus.send(redisquesAddress, buildGetConfigurationOperation(), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+            if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
+                jsonResponse(ctx.response(), reply.result().body().getJsonObject(VALUE));
+            } else {
+                String error = "Error gathering configuration";
+                log.error(error);
+                respondWith(StatusCode.INTERNAL_SERVER_ERROR, error, ctx.request());
             }
         });
     }

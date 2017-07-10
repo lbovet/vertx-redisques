@@ -100,6 +100,25 @@ This class provides utility methods for a simple configuration of the queue oper
 ### Queue operations
 The following operations are available in the Redisques module.
 
+#### getConfiguration
+
+Request Data
+
+```
+{
+    "operation": "getConfiguration"
+}
+```
+
+Response Data
+
+```
+{
+    "status": "ok" / "error",
+    "value": <obj RESULT>
+}
+```
+
 #### enqueue
 
 Request Data
@@ -476,8 +495,34 @@ The result will be a json object with the available endpoints like the example b
   "queuing": [
     "locks/",
     "queues/",
-    "monitor/"
+    "monitor/",
+    "configuration/"
   ]
+}
+```
+
+### Get configuration
+The configuration information contains the currently active configuration values. To get the configuration use
+> GET /queuing/configuration
+
+The result will be a json object with the configuration values like the example below
+
+```json
+{
+    "redisHost": "localhost",
+    "checkInterval": 10,
+    "address": "redisques",
+    "httpRequestHandlerEnabled": true,
+    "redis-prefix": "redisques:",
+    "processorTimeout": 240000,
+    "processorDelayMax": 0,
+    "refresh-period": 10,
+    "httpRequestHandlerPrefix": "/queuing",
+    "redisEncoding": "UTF-8",
+    "httpRequestHandlerPort": 7070,
+    "httpRequestHandlerUserHeader": "x-rp-usr",
+    "redisPort": 6379,
+    "processor-address": "redisques-processor"
 }
 ```
 

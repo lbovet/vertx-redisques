@@ -146,6 +146,14 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
     }
 
     @Test
+    public void listEndpoints(TestContext context) {
+        when().get("/queuing/")
+                .then().assertThat()
+                .statusCode(200)
+                .body("queuing", hasItems("locks/", "queues/", "monitor/", "configuration/"));
+    }
+
+    @Test
     public void getQueuesCount(TestContext context) {
         Async async = context.async();
         flushAll();
