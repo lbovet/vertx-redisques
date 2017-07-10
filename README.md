@@ -556,7 +556,7 @@ To set the configuration use
 > POST /queuing/configuration
 
 having the payload in the request body. The current implementation supports the following configuration values only:
-```json
+```
 {
   "processorDelayMax": 0 // number value in milliseconds 
 }
