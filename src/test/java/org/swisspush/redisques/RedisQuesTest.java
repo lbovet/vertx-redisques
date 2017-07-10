@@ -7,7 +7,7 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.Timeout;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.swisspush.redisques.util.RedisquesConfiguration;
@@ -25,8 +25,8 @@ public class RedisQuesTest extends AbstractTestCase {
     @Rule
     public Timeout rule = Timeout.seconds(5);
 
-    @BeforeClass
-    public static void deployRedisques(TestContext context) {
+    @Before
+    public void deployRedisques(TestContext context) {
         vertx = Vertx.vertx();
 
         JsonObject config = RedisquesConfiguration.with()
@@ -75,7 +75,7 @@ public class RedisQuesTest extends AbstractTestCase {
             context.assertEquals(configuration.getInteger("checkInterval"), 60);
             context.assertEquals(configuration.getInteger("refresh-period"), 2);
             context.assertEquals(configuration.getInteger("processorTimeout"), 240000);
-            context.assertEquals(configuration.getInteger("processorDelayMax"), 0);
+            context.assertEquals(configuration.getLong("processorDelayMax"), 0L);
 
             context.assertFalse(configuration.getBoolean("httpRequestHandlerEnabled"));
             context.assertEquals(configuration.getInteger("httpRequestHandlerPort"), 7070);
@@ -83,6 +83,50 @@ public class RedisQuesTest extends AbstractTestCase {
             context.assertEquals(configuration.getString("httpRequestHandlerUserHeader"), "x-rp-usr");
 
             async.complete();
+        });
+    }
+
+    @Test
+    public void setConfigurationImplementedValuesOnly(TestContext context) {
+        Async async = context.async();
+        eventBusSend(buildOperation(QueueOperation.setConfiguration,
+                new JsonObject().put(PROCESSOR_DELAY_MAX, 99).put("redisHost", "anotherHost").put("redisPort", 1234)), message -> {
+            context.assertEquals(ERROR, message.result().body().getString(STATUS));
+            context.assertEquals("Not supported configuration values received: redisHost, redisPort", message.result().body().getString(MESSAGE));
+            async.complete();
+        });
+    }
+
+    @Test
+    public void setConfigurationWrongDataType(TestContext context) {
+        Async async = context.async();
+        eventBusSend(buildOperation(QueueOperation.setConfiguration,
+                new JsonObject().put(PROCESSOR_DELAY_MAX, "a_string_value")), message -> {
+            context.assertEquals(ERROR, message.result().body().getString(STATUS));
+            context.assertEquals("Value for configuration property '"+PROCESSOR_DELAY_MAX+"' is not a number", message.result().body().getString(MESSAGE));
+            async.complete();
+        });
+    }
+
+    @Test
+    public void setConfigurationProcessorDelayMax(TestContext context) {
+        Async async = context.async();
+        eventBusSend(buildGetConfigurationOperation(), getConfig -> {
+            context.assertEquals(OK, getConfig.result().body().getString(STATUS));
+            JsonObject configuration = getConfig.result().body().getJsonObject(VALUE);
+            context.assertNotNull(configuration);
+            context.assertEquals(configuration.getLong(PROCESSOR_DELAY_MAX), 0L);
+
+            eventBusSend(buildSetConfigurationOperation(1234), setConfig -> {
+                context.assertEquals(OK, setConfig.result().body().getString(STATUS));
+                eventBusSend(buildGetConfigurationOperation(), getConfigAgain -> {
+                    context.assertEquals(OK, getConfigAgain.result().body().getString(STATUS));
+                    JsonObject updatedConfig = getConfigAgain.result().body().getJsonObject(VALUE);
+                    context.assertNotNull(updatedConfig);
+                    context.assertEquals(updatedConfig.getLong(PROCESSOR_DELAY_MAX), 1234L);
+                    async.complete();
+                });
+            });
         });
     }
 

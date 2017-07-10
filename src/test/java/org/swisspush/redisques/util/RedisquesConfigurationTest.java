@@ -28,7 +28,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRedisEncoding(), "UTF-8");
         testContext.assertEquals(config.getCheckInterval(), 60);
         testContext.assertEquals(config.getProcessorTimeout(), 240000);
-        testContext.assertEquals(config.getProcessorDelayMax(), 0);
+        testContext.assertEquals(config.getProcessorDelayMax(), 0L);
         testContext.assertFalse(config.getHttpRequestHandlerEnabled());
         testContext.assertEquals(config.getHttpRequestHandlerPrefix(), "/queuing");
         testContext.assertEquals(config.getHttpRequestHandlerPort(), 7070);
@@ -62,7 +62,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRedisPort(), 1234);
         testContext.assertEquals(config.getCheckInterval(), 5);
         testContext.assertEquals(config.getProcessorTimeout(), 10);
-        testContext.assertEquals(config.getProcessorDelayMax(), 50);
+        testContext.assertEquals(config.getProcessorDelayMax(), 50L);
         testContext.assertTrue(config.getHttpRequestHandlerEnabled());
         testContext.assertEquals(config.getHttpRequestHandlerPrefix(), "/queuing/test");
         testContext.assertEquals(config.getHttpRequestHandlerPort(), 7171);
@@ -139,7 +139,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRedisEncoding(), "UTF-8");
         testContext.assertEquals(config.getCheckInterval(), 60);
         testContext.assertEquals(config.getProcessorTimeout(), 240000);
-        testContext.assertEquals(config.getProcessorDelayMax(), 0);
+        testContext.assertEquals(config.getProcessorDelayMax(), 0L);
         testContext.assertFalse(config.getHttpRequestHandlerEnabled());
         testContext.assertEquals(config.getHttpRequestHandlerPrefix(), "/queuing");
         testContext.assertEquals(config.getHttpRequestHandlerPort(), 7070);
@@ -175,7 +175,7 @@ public class RedisquesConfigurationTest {
         testContext.assertEquals(config.getRedisEncoding(), "new_encoding");
         testContext.assertEquals(config.getCheckInterval(), 5);
         testContext.assertEquals(config.getProcessorTimeout(), 30);
-        testContext.assertEquals(config.getProcessorDelayMax(), 99);
+        testContext.assertEquals(config.getProcessorDelayMax(), 99L);
         testContext.assertTrue(config.getHttpRequestHandlerEnabled());
         testContext.assertEquals(config.getHttpRequestHandlerPort(), 7171);
         testContext.assertEquals(config.getHttpRequestHandlerPrefix(), "/queuing/test123");
@@ -185,19 +185,19 @@ public class RedisquesConfigurationTest {
     @Test
     public void testProcessorDelay(TestContext testContext){
         RedisquesConfiguration config = with().processorDelayMax(5).build();
-        testContext.assertEquals(5, config.getProcessorDelayMax());
+        testContext.assertEquals(5L, config.getProcessorDelayMax());
 
         config = with().processorDelayMax(0).build();
-        testContext.assertEquals(0, config.getProcessorDelayMax());
+        testContext.assertEquals(0L, config.getProcessorDelayMax());
 
         // test negative value
         config = with().processorDelayMax(-50).build();
-        testContext.assertEquals(0, config.getProcessorDelayMax());
+        testContext.assertEquals(0L, config.getProcessorDelayMax());
         config = with().processorDelayMax(Integer.MIN_VALUE).build();
-        testContext.assertEquals(0, config.getProcessorDelayMax());
+        testContext.assertEquals(0L, config.getProcessorDelayMax());
 
-        config = with().processorDelayMax(Integer.MAX_VALUE).build();
-        testContext.assertEquals(Integer.MAX_VALUE, config.getProcessorDelayMax());
+        config = with().processorDelayMax(Long.MAX_VALUE).build();
+        testContext.assertEquals(Long.MAX_VALUE, config.getProcessorDelayMax());
     }
 
     @Test

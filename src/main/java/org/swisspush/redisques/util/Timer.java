@@ -26,11 +26,11 @@ public class Timer {
      * @param delayMs the delay in milliseconds
      * @return A {@link Future} which completes after the delay
      */
-    public Future<Void> executeDelayedMax(int delayMs) {
+    public Future<Void> executeDelayedMax(long delayMs) {
         Future<Void> future = Future.future();
 
         if (delayMs > 0) {
-            vertx.setTimer(random.nextInt(delayMs + 1) + 1, delayed -> future.complete());
+            vertx.setTimer(random.nextInt((int) (delayMs + 1)) + 1, delayed -> future.complete());
         } else {
             future.complete();
         }

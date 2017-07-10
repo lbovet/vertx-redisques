@@ -19,14 +19,14 @@ public class RedisquesConfiguration {
     private String redisEncoding;
     private int checkInterval;
     private int processorTimeout;
-    private int processorDelayMax;
+    private long processorDelayMax;
     private boolean httpRequestHandlerEnabled;
     private String httpRequestHandlerPrefix;
     private Integer httpRequestHandlerPort;
     private String httpRequestHandlerUserHeader;
 
     private static final int DEFAULT_CHECK_INTERVAL = 60; // 60s
-    private static final int DEFAULT_PROCESSOR_DELAY_MAX = 0;
+    private static final long DEFAULT_PROCESSOR_DELAY_MAX = 0;
 
     public static final String PROP_ADDRESS = "address";
     public static final String PROP_REDIS_PREFIX = "redis-prefix";
@@ -75,7 +75,7 @@ public class RedisquesConfiguration {
 
     public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
                                   String redisHost, int redisPort, String redisEncoding, int checkInterval,
-                                  int processorTimeout, int processorDelayMax, boolean httpRequestHandlerEnabled,
+                                  int processorTimeout, long processorDelayMax, boolean httpRequestHandlerEnabled,
                                   String httpRequestHandlerPrefix, Integer httpRequestHandlerPort,
                                   String httpRequestHandlerUserHeader) {
         this.address = address;
@@ -170,7 +170,7 @@ public class RedisquesConfiguration {
             builder.processorTimeout(json.getInteger(PROP_PROCESSOR_TIMEOUT));
         }
         if(json.containsKey(PROP_PROCESSOR_DELAY_MAX)){
-            builder.processorDelayMax(json.getInteger(PROP_PROCESSOR_DELAY_MAX));
+            builder.processorDelayMax(json.getLong(PROP_PROCESSOR_DELAY_MAX));
         }
         if(json.containsKey(PROP_HTTP_REQUEST_HANDLER_ENABLED)){
             builder.httpRequestHandlerEnabled(json.getBoolean(PROP_HTTP_REQUEST_HANDLER_ENABLED));
@@ -213,7 +213,7 @@ public class RedisquesConfiguration {
 
     public int getProcessorTimeout() { return processorTimeout; }
 
-    public int getProcessorDelayMax() { return processorDelayMax; }
+    public long getProcessorDelayMax() { return processorDelayMax; }
 
     public boolean getHttpRequestHandlerEnabled() { return  httpRequestHandlerEnabled; }
 
@@ -262,7 +262,7 @@ public class RedisquesConfiguration {
         private String redisEncoding;
         private int checkInterval;
         private int processorTimeout;
-        private int processorDelayMax;
+        private long processorDelayMax;
         private boolean httpRequestHandlerEnabled;
         private String httpRequestHandlerPrefix;
         private Integer httpRequestHandlerPort;
@@ -330,7 +330,7 @@ public class RedisquesConfiguration {
             return this;
         }
 
-        public RedisquesConfigurationBuilder processorDelayMax(int processorDelayMax){
+        public RedisquesConfigurationBuilder processorDelayMax(long processorDelayMax){
             this.processorDelayMax = processorDelayMax;
             return this;
         }

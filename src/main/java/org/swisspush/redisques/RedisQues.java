@@ -1,5 +1,8 @@
 package org.swisspush.redisques;
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
@@ -19,11 +22,9 @@ import org.swisspush.redisques.lua.LuaScriptManager;
 import org.swisspush.redisques.util.RedisquesConfiguration;
 import org.swisspush.redisques.util.Timer;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static org.swisspush.redisques.util.RedisquesAPI.*;
 
@@ -94,7 +95,7 @@ public class RedisQues extends AbstractVerticle {
     // the time we wait for the processor to answer, before we cancel processing
     private int processorTimeout = 240000;
 
-    private int processorDelayMax;
+    private long processorDelayMax;
     private Timer timer;
 
     private String redisHost;
@@ -108,6 +109,8 @@ public class RedisQues extends AbstractVerticle {
 
     private static final int DEFAULT_MAX_QUEUEITEM_COUNT = 49;
     private static final int MAX_AGE_MILLISECONDS = 120000; // 120 seconds
+
+    private static final Set<String> ALLOWED_CONFIGURATION_VALUES = Sets.newHashSet("processorDelayMax");
 
     private LuaScriptManager luaScriptManager;
 
@@ -243,6 +246,9 @@ public class RedisQues extends AbstractVerticle {
                     break;
                 case getConfiguration:
                     getConfiguration(event);
+                    break;
+                case setConfiguration:
+                    setConfiguration(event);
                     break;
                 default:
                     unsupportedOperation(operation, event);
@@ -425,6 +431,35 @@ public class RedisQues extends AbstractVerticle {
         result.put(RedisquesConfiguration.PROP_HTTP_REQUEST_HANDLER_PORT, httpRequestHandlerPort);
         result.put(RedisquesConfiguration.PROP_HTTP_REQUEST_HANDLER_USER_HEADER, httpRequestHandlerUserHeader);
         event.reply(new JsonObject().put(STATUS, OK).put(VALUE, result));
+    }
+
+    private void setConfiguration(Message<JsonObject> event) {
+        JsonObject configurationValues = event.body().getJsonObject(PAYLOAD);
+        if (configurationValues != null) {
+            List<String> notAllowedConfigurationValues = findNotAllowedConfigurationValues(configurationValues.fieldNames());
+            if(notAllowedConfigurationValues.isEmpty()){
+                try {
+                    Long processorDelayMaxValue = configurationValues.getLong(PROCESSOR_DELAY_MAX);
+                    this.processorDelayMax = processorDelayMaxValue;
+                    log.info("Updated configuration value of property '"+PROCESSOR_DELAY_MAX+"' to " + processorDelayMaxValue);
+                    event.reply(new JsonObject().put(STATUS, OK));
+                } catch(ClassCastException ex){
+                    event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, "Value for configuration property '"+PROCESSOR_DELAY_MAX+"' is not a number"));
+                }
+            } else {
+                String notAllowedConfigurationValuesString = Joiner.on(", ").join(notAllowedConfigurationValues);
+                event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, "Not supported configuration values received: " + notAllowedConfigurationValuesString));
+            }
+        } else {
+            event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, "Configuration values missing"));
+        }
+    }
+
+    private List<String> findNotAllowedConfigurationValues(Set<String> configurationValues) {
+        if (configurationValues == null) {
+            return Lists.newArrayList();
+        }
+        return configurationValues.stream().filter(p -> !ALLOWED_CONFIGURATION_VALUES.contains(p)).collect(Collectors.toList());
     }
 
     private void registerQueueCheck(RedisquesConfiguration modConfig) {
@@ -673,7 +708,7 @@ public class RedisQues extends AbstractVerticle {
 
     private void processMessageWithTimeout(final String queue, final String payload, final Handler<SendResult> handler) {
         timer.executeDelayedMax(processorDelayMax).setHandler(delayed -> {
-            if(delayed.failed()){
+            if (delayed.failed()) {
                 log.error("Delayed execution has failed. Cause: " + delayed.cause().getMessage());
                 return;
             }
