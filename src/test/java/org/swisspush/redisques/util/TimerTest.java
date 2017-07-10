@@ -36,7 +36,7 @@ public class TimerTest {
     public void testExecuteDelayedShort(TestContext context){
         Async async = context.async();
         Timer timer = new Timer(Vertx.vertx());
-        final int delayMs = 10;
+        final int delayMs = 50;
         final long start = System.currentTimeMillis();
 
         timer.executeDelayedMax(delayMs).setHandler(delayed -> {
@@ -70,8 +70,8 @@ public class TimerTest {
         if(delayMs <= 0){
             delayMs = 1;
         }
-        double delayPlus10Percent = delayMs * 1.2;
-        context.assertTrue(duration < delayPlus10Percent, "Future completed after " + duration + "ms. " +
-                "However it should not have taken more than the delay + 20% which would be " + delayPlus10Percent + "ms");
+        double delayPlus50Percent = delayMs * 1.5;
+        context.assertTrue(duration <= delayPlus50Percent, "Future completed after " + duration + "ms. " +
+                "However it should not have taken more than the delay + 50% which would be " + delayPlus50Percent + "ms");
     }
 }
