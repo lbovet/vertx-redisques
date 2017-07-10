@@ -117,7 +117,7 @@ public class RedisQuesTest extends AbstractTestCase {
             context.assertNotNull(configuration);
             context.assertEquals(configuration.getLong(PROCESSOR_DELAY_MAX), 0L);
 
-            eventBusSend(buildSetConfigurationOperation(1234), setConfig -> {
+            eventBusSend(buildSetConfigurationOperation(new JsonObject().put(PROCESSOR_DELAY_MAX, 1234)), setConfig -> {
                 context.assertEquals(OK, setConfig.result().body().getString(STATUS));
                 eventBusSend(buildGetConfigurationOperation(), getConfigAgain -> {
                     context.assertEquals(OK, getConfigAgain.result().body().getString(STATUS));

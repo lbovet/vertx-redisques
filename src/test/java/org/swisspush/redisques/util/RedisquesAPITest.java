@@ -239,7 +239,7 @@ public class RedisquesAPITest {
 
     @Test
     public void testBuildSetConfigurationOperation(TestContext context) throws Exception {
-        JsonObject operation = RedisquesAPI.buildSetConfigurationOperation(99);
+        JsonObject operation = RedisquesAPI.buildSetConfigurationOperation(new JsonObject().put(PROCESSOR_DELAY_MAX, 99));
         JsonObject expected = buildExpectedJsonObject("setConfiguration", new JsonObject()
                 .put(PROCESSOR_DELAY_MAX, 99));
         context.assertEquals(expected, operation);

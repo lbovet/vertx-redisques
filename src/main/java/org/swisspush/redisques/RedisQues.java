@@ -440,6 +440,10 @@ public class RedisQues extends AbstractVerticle {
             if(notAllowedConfigurationValues.isEmpty()){
                 try {
                     Long processorDelayMaxValue = configurationValues.getLong(PROCESSOR_DELAY_MAX);
+                    if(processorDelayMaxValue == null){
+                        event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, "Value for configuration property '"+PROCESSOR_DELAY_MAX+"' is missing"));
+                        return;
+                    }
                     this.processorDelayMax = processorDelayMaxValue;
                     log.info("Updated configuration value of property '"+PROCESSOR_DELAY_MAX+"' to " + processorDelayMaxValue);
                     event.reply(new JsonObject().put(STATUS, OK));

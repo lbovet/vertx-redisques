@@ -50,6 +50,7 @@ The following configuration values are available:
 | redis-prefix | redisques: | Prefix for redis keys holding queues and consumers |
 | processor-address | redisques-processor | Address of message processors |
 | refresh-period | 10 | The frequency [s] of consumers refreshing their subscriptions to consume |
+| processorDelayMax | 0 | The maximum delay [ms] to wait between queue items before notify the consumer |
 | redisHost | localhost | The host where redis is running on |
 | redisPort | 6379 | The port where redis is running on |
 | redisEncoding | UTF-8 | The encoding to use in redis |
@@ -116,6 +117,30 @@ Response Data
 {
     "status": "ok" / "error",
     "value": <obj RESULT>
+}
+```
+
+#### setConfiguration
+
+Request Data
+
+```
+{
+    "operation": "setConfiguration",
+    "payload": {
+        "<str propertyName>": <str propertyValue>,
+        "<str property2Name>": <str property2Value>,
+        "<str property3Name>": <str property3Value>
+    }    
+}
+```
+
+Response Data
+
+```
+{
+    "status": "ok" / "error",
+    "message": <string error message when status=error>
 }
 ```
 
@@ -525,6 +550,21 @@ The result will be a json object with the configuration values like the example 
     "processor-address": "redisques-processor"
 }
 ```
+
+### Set configuration
+To set the configuration use
+> POST /queuing/configuration
+
+having the payload in the request body. The current implementation supports the following configuration values only:
+```json
+{
+  "processorDelayMax": 0 // number value in milliseconds 
+}
+```
+The following conditions will cause a _400 Bad Request_ response with a corresponding error message:
+* Body is not a valid json object
+* Body contains not supported configuration values
+* Body does not contain the _processorDelayMax_ property
 
 ### Get monitor information
 The monitor information contains the active queues and their queue items count. To get the monitor information use

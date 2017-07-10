@@ -103,6 +103,11 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
             "  }\n" +
             "}";
 
+    private final String configurationValid = "{\"processorDelayMax\":99}";
+    private final String configurationValidZero = "{\"processorDelayMax\":0}";
+    private final String configurationNotSupportedValues = "{\"processorDelayMax\":0, \"redisHost\":\"localhost\"}";
+    private final String configurationEmpty = "{}";
+
     @Rule
     public Timeout rule = Timeout.seconds(15);
 
@@ -179,21 +184,46 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
     }
 
     @Test
-    public void testConfigurationGetOnly(TestContext context) {
+    public void setConfiguration(TestContext context) {
         when()
-                .put("/queuing/configuration/")
+                .get("/queuing/configuration/")
                 .then().assertThat()
-                .statusCode(405);
+                .statusCode(200)
+                .body("processorDelayMax", equalTo(0));
 
+        // provide a valid configuration. this should change the value of the property
+        given().body(configurationValid).when().post("/queuing/configuration/").then().assertThat().statusCode(200);
         when()
-                .post("/queuing/configuration/")
+                .get("/queuing/configuration/")
                 .then().assertThat()
-                .statusCode(405);
+                .statusCode(200)
+                .body("processorDelayMax", equalTo(99));
 
+        // provide not supported configuration values. this should not change the value of the property
+        given().body(configurationNotSupportedValues).when().post("/queuing/configuration/")
+                .then().assertThat().statusCode(400).body(containsString("Not supported configuration values received: redisHost"));
         when()
-                .delete("/queuing/configuration/")
+                .get("/queuing/configuration/")
                 .then().assertThat()
-                .statusCode(405);
+                .statusCode(200)
+                .body("processorDelayMax", equalTo(99));
+
+        // provide empty configuration values (missing processorDelayMax property). this should not change the value of the property
+        given().body(configurationEmpty).when().post("/queuing/configuration/")
+                .then().assertThat().statusCode(400).body(containsString("Value for configuration property 'processorDelayMax' is missing"));
+        when()
+                .get("/queuing/configuration/")
+                .then().assertThat()
+                .statusCode(200)
+                .body("processorDelayMax", equalTo(99));
+
+        // again provide a valid configuration. this should change the value of the property
+        given().body(configurationValidZero).when().post("/queuing/configuration/").then().assertThat().statusCode(200);
+        when()
+                .get("/queuing/configuration/")
+                .then().assertThat()
+                .statusCode(200)
+                .body("processorDelayMax", equalTo(0));
     }
 
     @Test

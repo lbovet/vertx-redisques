@@ -4,6 +4,7 @@ import com.google.common.collect.Ordering;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.http.HttpServerOptions;
@@ -45,15 +46,15 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
     private final String redisquesAddress;
     private final String userHeader;
 
-    public static void init(Vertx vertx, RedisquesConfiguration modConfig){
+    public static void init(Vertx vertx, RedisquesConfiguration modConfig) {
         log.info("Enable http request handler: " + modConfig.getHttpRequestHandlerEnabled());
-        if(modConfig.getHttpRequestHandlerEnabled()){
-            if(modConfig.getHttpRequestHandlerPort() != null && modConfig.getHttpRequestHandlerUserHeader() != null){
+        if (modConfig.getHttpRequestHandlerEnabled()) {
+            if (modConfig.getHttpRequestHandlerPort() != null && modConfig.getHttpRequestHandlerUserHeader() != null) {
                 RedisquesHttpRequestHandler handler = new RedisquesHttpRequestHandler(vertx, modConfig);
                 // in Vert.x 2x 100-continues was activated per default, in vert.x 3x it is off per default.
                 HttpServerOptions options = new HttpServerOptions().setHandle100ContinueAutomatically(true);
                 vertx.createHttpServer(options).requestHandler(handler).listen(modConfig.getHttpRequestHandlerPort(), result -> {
-                    if(result.succeeded()){
+                    if (result.succeeded()) {
                         log.info("Successfully started http request handler on port " + modConfig.getHttpRequestHandlerPort());
                     } else {
                         log.error("Unable to start http request handler. Message: " + result.cause().getMessage());
@@ -82,6 +83,11 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
          * Get configuration
          */
         router.get(prefix + "/configuration/").handler(this::getConfiguration);
+
+        /*
+         * Set configuration
+         */
+        router.post(prefix + "/configuration/").handler(this::setConfiguration);
 
         /*
          * Get monitor information
@@ -190,9 +196,9 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
-    private JsonObject buildEnqueueOrLockedEnqueueOperation(String queue, String message, HttpServerRequest request){
+    private JsonObject buildEnqueueOrLockedEnqueueOperation(String queue, String message, HttpServerRequest request) {
         boolean lockedEnqueue = request.params().contains(LOCKED_PARAM);
-        if(lockedEnqueue){
+        if (lockedEnqueue) {
             return buildLockedEnqueueOperation(queue, message, extractUser(request));
         } else {
             return buildEnqueueOperation(queue, message);
@@ -260,7 +266,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
-    private void getConfiguration(RoutingContext ctx){
+    private void getConfiguration(RoutingContext ctx) {
         eventBus.send(redisquesAddress, buildGetConfigurationOperation(), (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
             if (reply.succeeded() && OK.equals(reply.result().body().getString(STATUS))) {
                 jsonResponse(ctx.response(), reply.result().body().getJsonObject(VALUE));
@@ -272,7 +278,29 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
-    private void getMonitorInformation(RoutingContext ctx){
+    private void setConfiguration(RoutingContext ctx) {
+        ctx.request().bodyHandler((Buffer buffer) -> {
+            try {
+                JsonObject configurationValues = new JsonObject(buffer.toString());
+                eventBus.send(redisquesAddress, buildSetConfigurationOperation(configurationValues),
+                        (Handler<AsyncResult<Message<JsonObject>>>) reply -> {
+                            if (reply.failed()) {
+                                respondWith(StatusCode.INTERNAL_SERVER_ERROR, reply.cause().getMessage(), ctx.request());
+                            } else {
+                                if (OK.equals(reply.result().body().getString(STATUS))) {
+                                    respondWith(StatusCode.OK, ctx.request());
+                                } else {
+                                    respondWith(StatusCode.BAD_REQUEST, reply.result().body().getString(MESSAGE), ctx.request());
+                                }
+                            }
+                        });
+            } catch (Exception ex) {
+                respondWith(StatusCode.BAD_REQUEST, ex.getMessage(), ctx.request());
+            }
+        });
+    }
+
+    private void getMonitorInformation(RoutingContext ctx) {
         boolean emptyQueues = ctx.request().params().contains("emptyQueues");
         final JsonObject resultObject = new JsonObject();
         final JsonArray queuesArray = new JsonArray();
@@ -341,7 +369,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
                 jsonResponse(ctx.response(), result);
             } else {
                 ctx.response().setStatusCode(StatusCode.NOT_FOUND.getStatusCode());
-                ctx.response().end(reply.result().body().getString("message"));
+                ctx.response().end(reply.result().body().getString(MESSAGE));
                 log.warn("Error in routerMatcher.getWithRegEx. Command = '" + (replyBody.getString("command") == null ? "<null>" : replyBody.getString("command")) + "'.");
             }
         });
@@ -376,7 +404,7 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
-    private void replaceSingleQueueItem(RoutingContext ctx){
+    private void replaceSingleQueueItem(RoutingContext ctx) {
         final String queue = part(ctx.request().path(), 2);
         checkLocked(queue, ctx.request(), aVoid -> {
             final int index = Integer.parseInt(lastPart(ctx.request().path()));
@@ -536,12 +564,12 @@ public class RedisquesHttpRequestHandler implements Handler<HttpServerRequest> {
         return object.toString();
     }
 
-    private int extractLimit(RoutingContext ctx){
+    private int extractLimit(RoutingContext ctx) {
         String limitParam = ctx.request().params().get("limit");
-        try{
+        try {
             return Integer.parseInt(limitParam);
-        } catch (NumberFormatException ex){
-            if(limitParam != null){
+        } catch (NumberFormatException ex) {
+            if (limitParam != null) {
                 log.warn("Non-numeric limit parameter value used: " + limitParam);
             }
             return Integer.MAX_VALUE;

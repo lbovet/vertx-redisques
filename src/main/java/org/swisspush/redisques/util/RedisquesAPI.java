@@ -92,13 +92,9 @@ public class RedisquesAPI {
 
     public static JsonObject buildGetConfigurationOperation() { return buildOperation(QueueOperation.getConfiguration); }
 
-    public static JsonObject buildSetConfigurationOperation(long processorDelayMax) {
-        return buildOperation(QueueOperation.setConfiguration, new JsonObject().put(PROCESSOR_DELAY_MAX, processorDelayMax));
-    }
+    public static JsonObject buildSetConfigurationOperation(JsonObject configuration) { return buildOperation(QueueOperation.setConfiguration, configuration); }
 
-    public static JsonObject buildCheckOperation(){
-        return buildOperation(QueueOperation.check);
-    }
+    public static JsonObject buildCheckOperation(){ return buildOperation(QueueOperation.check); }
 
     public static JsonObject buildEnqueueOperation(String queueName, String message){
         JsonObject operation = buildOperation(QueueOperation.enqueue, new JsonObject().put(QUEUENAME, queueName));
