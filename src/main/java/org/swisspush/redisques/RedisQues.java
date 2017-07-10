@@ -94,7 +94,7 @@ public class RedisQues extends AbstractVerticle {
     // the time we wait for the processor to answer, before we cancel processing
     private int processorTimeout = 240000;
 
-    private int processorDelayMs;
+    private int processorDelayMax;
     private Timer timer;
 
     private static final int DEFAULT_MAX_QUEUEITEM_COUNT = 49;
@@ -140,7 +140,7 @@ public class RedisQues extends AbstractVerticle {
         refreshPeriod = modConfig.getRefreshPeriod();
         checkInterval = modConfig.getCheckInterval();
         processorTimeout = modConfig.getProcessorTimeout();
-        processorDelayMs = modConfig.getProcessorDelay();
+        processorDelayMax = modConfig.getProcessorDelayMax();
         timer = new Timer(vertx);
 
         this.redisClient = RedisClient.create(vertx, new RedisOptions()
@@ -632,7 +632,7 @@ public class RedisQues extends AbstractVerticle {
     }
 
     private void processMessageWithTimeout(final String queue, final String payload, final Handler<SendResult> handler) {
-        timer.executeDelayedMax(processorDelayMs).setHandler(delayed -> {
+        timer.executeDelayedMax(processorDelayMax).setHandler(delayed -> {
             if(delayed.failed()){
                 log.error("Delayed execution has failed. Cause: " + delayed.cause().getMessage());
                 return;

@@ -63,7 +63,7 @@ public class RedisQuesProcessorDelayedExecutionTest extends AbstractTestCase {
                 .processorAddress("processor-address")
                 .redisEncoding("ISO-8859-1")
                 .refreshPeriod(2)
-                .processorDelay(1500)
+                .processorDelayMax(1500)
                 .build()
                 .asJsonObject();
 
