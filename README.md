@@ -50,6 +50,7 @@ The following configuration values are available:
 | redis-prefix | redisques: | Prefix for redis keys holding queues and consumers |
 | processor-address | redisques-processor | Address of message processors |
 | refresh-period | 10 | The frequency [s] of consumers refreshing their subscriptions to consume |
+| processorDelayMax | 0 | The maximum delay [ms] to wait between queue items before notify the consumer |
 | redisHost | localhost | The host where redis is running on |
 | redisPort | 6379 | The port where redis is running on |
 | redisEncoding | UTF-8 | The encoding to use in redis |
@@ -61,7 +62,7 @@ The following configuration values are available:
 
 ### Configuration util
 
-The configurations have to be passed as JsonObject to the module. For a simplyfied configuration the _RedisquesConfigurationBuilder_ can be used.
+The configurations have to be passed as JsonObject to the module. For a simplified configuration the _RedisquesConfigurationBuilder_ can be used.
 
 Example:
 
@@ -74,7 +75,7 @@ RedisquesConfiguration config = RedisquesConfiguration.with()
 JsonObject json = config.asJsonObject();
 ```
 
-Properties not overriden will not be changed. Thus remaining default.
+Properties not overridden will not be changed. Thus remaining default.
 
 To use default values only, the _RedisquesConfiguration_ constructor without parameters can be used:
 
@@ -91,7 +92,7 @@ Redisques API for Vert.x - Eventbus
 > address = redisque
 
 ### RedisquesAPI util
-For a simplyfied working with the Redisques module, see the RedisquesAPI class:
+For a simplified working with the Redisques module, see the RedisquesAPI class:
 
 > org.swisspush.redisques.util.RedisquesAPI
 
@@ -99,6 +100,49 @@ This class provides utility methods for a simple configuration of the queue oper
 
 ### Queue operations
 The following operations are available in the Redisques module.
+
+#### getConfiguration
+
+Request Data
+
+```
+{
+    "operation": "getConfiguration"
+}
+```
+
+Response Data
+
+```
+{
+    "status": "ok" / "error",
+    "value": <obj RESULT>
+}
+```
+
+#### setConfiguration
+
+Request Data
+
+```
+{
+    "operation": "setConfiguration",
+    "payload": {
+        "<str propertyName>": <str propertyValue>,
+        "<str property2Name>": <str property2Value>,
+        "<str property3Name>": <str property3Value>
+    }    
+}
+```
+
+Response Data
+
+```
+{
+    "status": "ok" / "error",
+    "message": <string error message when status=error>
+}
+```
 
 #### enqueue
 
@@ -476,10 +520,51 @@ The result will be a json object with the available endpoints like the example b
   "queuing": [
     "locks/",
     "queues/",
-    "monitor/"
+    "monitor/",
+    "configuration/"
   ]
 }
 ```
+
+### Get configuration
+The configuration information contains the currently active configuration values. To get the configuration use
+> GET /queuing/configuration
+
+The result will be a json object with the configuration values like the example below
+
+```json
+{
+    "redisHost": "localhost",
+    "checkInterval": 10,
+    "address": "redisques",
+    "httpRequestHandlerEnabled": true,
+    "redis-prefix": "redisques:",
+    "processorTimeout": 240000,
+    "processorDelayMax": 0,
+    "refresh-period": 10,
+    "httpRequestHandlerPrefix": "/queuing",
+    "redisEncoding": "UTF-8",
+    "httpRequestHandlerPort": 7070,
+    "httpRequestHandlerUserHeader": "x-rp-usr",
+    "redisPort": 6379,
+    "processor-address": "redisques-processor"
+}
+```
+
+### Set configuration
+To set the configuration use
+> POST /queuing/configuration
+
+having the payload in the request body. The current implementation supports the following configuration values only:
+```
+{
+  "processorDelayMax": 0 // number value in milliseconds 
+}
+```
+The following conditions will cause a _400 Bad Request_ response with a corresponding error message:
+* Body is not a valid json object
+* Body contains not supported configuration values
+* Body does not contain the _processorDelayMax_ property
 
 ### Get monitor information
 The monitor information contains the active queues and their queue items count. To get the monitor information use

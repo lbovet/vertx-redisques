@@ -6,7 +6,7 @@ import io.vertx.ext.unit.junit.VertxUnitRunner;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import static org.swisspush.redisques.util.RedisquesAPI.*;
+import static org.swisspush.redisques.util.RedisquesAPI.QueueOperation;
 
 /**
  * Tests for {@link RedisquesAPI} class.
@@ -17,6 +17,7 @@ import static org.swisspush.redisques.util.RedisquesAPI.*;
 public class RedisquesAPITest {
 
     public static final String QUEUENAME = "queuename";
+    public static final String PROCESSOR_DELAY_MAX = "processorDelayMax";
     public static final String REQUESTED_BY = "requestedBy";
     public static final String INDEX = "index";
     public static final String LIMIT = "limit";
@@ -91,6 +92,7 @@ public class RedisquesAPITest {
         context.assertFalse(QueueOperation.getQueues.hasLegacyName());
         context.assertFalse(QueueOperation.getQueuesCount.hasLegacyName());
         context.assertFalse(QueueOperation.getQueueItemsCount.hasLegacyName());
+        context.assertFalse(QueueOperation.getConfiguration.hasLegacyName());
     }
 
     @Test
@@ -184,7 +186,6 @@ public class RedisquesAPITest {
         context.assertEquals(buildExpectedJsonObject("getQueuesCount"), operation);
     }
 
-
     @Test
     public void testBuildGetQueueItemsCountOperation(TestContext context) throws Exception {
         JsonObject operation = RedisquesAPI.buildGetQueueItemsCountOperation("my_queue_name");
@@ -228,6 +229,20 @@ public class RedisquesAPITest {
     public void testBuildCheckOperation(TestContext context) throws Exception {
         JsonObject operation = RedisquesAPI.buildCheckOperation();
         context.assertEquals(buildExpectedJsonObject("check"), operation);
+    }
+
+    @Test
+    public void testBuildGetConfigurationOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildGetConfigurationOperation();
+        context.assertEquals(buildExpectedJsonObject("getConfiguration"), operation);
+    }
+
+    @Test
+    public void testBuildSetConfigurationOperation(TestContext context) throws Exception {
+        JsonObject operation = RedisquesAPI.buildSetConfigurationOperation(new JsonObject().put(PROCESSOR_DELAY_MAX, 99));
+        JsonObject expected = buildExpectedJsonObject("setConfiguration", new JsonObject()
+                .put(PROCESSOR_DELAY_MAX, 99));
+        context.assertEquals(expected, operation);
     }
 
     private JsonObject buildExpectedJsonObject(String operation){

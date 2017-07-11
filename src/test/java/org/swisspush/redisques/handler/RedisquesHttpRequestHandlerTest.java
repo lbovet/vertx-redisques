@@ -7,7 +7,10 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.Timeout;
-import org.junit.*;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 import org.swisspush.redisques.AbstractTestCase;
 import org.swisspush.redisques.RedisQues;
 import org.swisspush.redisques.util.RedisquesConfiguration;
@@ -100,6 +103,11 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
             "  }\n" +
             "}";
 
+    private final String configurationValid = "{\"processorDelayMax\":99}";
+    private final String configurationValidZero = "{\"processorDelayMax\":0}";
+    private final String configurationNotSupportedValues = "{\"processorDelayMax\":0, \"redisHost\":\"localhost\"}";
+    private final String configurationEmpty = "{}";
+
     @Rule
     public Timeout rule = Timeout.seconds(15);
 
@@ -143,6 +151,79 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
                 .then().assertThat()
                 .statusCode(405);
         async.complete();
+    }
+
+    @Test
+    public void listEndpoints(TestContext context) {
+        when().get("/queuing/")
+                .then().assertThat()
+                .statusCode(200)
+                .body("queuing", hasItems("locks/", "queues/", "monitor/", "configuration/"));
+    }
+
+    @Test
+    public void getConfiguration(TestContext context) {
+        when()
+                .get("/queuing/configuration/")
+                .then().assertThat()
+                .statusCode(200)
+                .body("any { it.key == 'redisHost' }", is(true)) // checks whether the property 'redisHost' exists. Ignoring the value
+                .body("any { it.key == 'redisPort' }", is(true))
+                .body("any { it.key == 'redisEncoding' }", is(true))
+                .body("any { it.key == 'redis-prefix' }", is(true))
+                .body("any { it.key == 'address' }", is(true))
+                .body("any { it.key == 'processor-address' }", is(true))
+                .body("any { it.key == 'refresh-period' }", is(true))
+                .body("any { it.key == 'checkInterval' }", is(true))
+                .body("any { it.key == 'processorTimeout' }", is(true))
+                .body("any { it.key == 'processorDelayMax' }", is(true))
+                .body("any { it.key == 'httpRequestHandlerEnabled' }", is(true))
+                .body("any { it.key == 'httpRequestHandlerPrefix' }", is(true))
+                .body("any { it.key == 'httpRequestHandlerPort' }", is(true))
+                .body("any { it.key == 'httpRequestHandlerUserHeader' }", is(true));
+    }
+
+    @Test
+    public void setConfiguration(TestContext context) {
+        when()
+                .get("/queuing/configuration/")
+                .then().assertThat()
+                .statusCode(200)
+                .body("processorDelayMax", equalTo(0));
+
+        // provide a valid configuration. this should change the value of the property
+        given().body(configurationValid).when().post("/queuing/configuration/").then().assertThat().statusCode(200);
+        when()
+                .get("/queuing/configuration/")
+                .then().assertThat()
+                .statusCode(200)
+                .body("processorDelayMax", equalTo(99));
+
+        // provide not supported configuration values. this should not change the value of the property
+        given().body(configurationNotSupportedValues).when().post("/queuing/configuration/")
+                .then().assertThat().statusCode(400).body(containsString("Not supported configuration values received: redisHost"));
+        when()
+                .get("/queuing/configuration/")
+                .then().assertThat()
+                .statusCode(200)
+                .body("processorDelayMax", equalTo(99));
+
+        // provide empty configuration values (missing processorDelayMax property). this should not change the value of the property
+        given().body(configurationEmpty).when().post("/queuing/configuration/")
+                .then().assertThat().statusCode(400).body(containsString("Value for configuration property 'processorDelayMax' is missing"));
+        when()
+                .get("/queuing/configuration/")
+                .then().assertThat()
+                .statusCode(200)
+                .body("processorDelayMax", equalTo(99));
+
+        // again provide a valid configuration. this should change the value of the property
+        given().body(configurationValidZero).when().post("/queuing/configuration/").then().assertThat().statusCode(200);
+        when()
+                .get("/queuing/configuration/")
+                .then().assertThat()
+                .statusCode(200)
+                .body("processorDelayMax", equalTo(0));
     }
 
     @Test
@@ -203,11 +284,11 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
 
-        given().body(queueItemValid).when().put("/queuing/enqueue/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().put("/queuing/enqueue/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
-        given().body(queueItemValid).when().put("/queuing/enqueue/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().put("/queuing/enqueue/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(2L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
@@ -224,7 +305,7 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
 
-        given().body(queueItemInvalid).when().put("/queuing/enqueue/"+queueName+"/").then().assertThat().statusCode(400);
+        given().body(queueItemInvalid).when().put("/queuing/enqueue/" + queueName + "/").then().assertThat().statusCode(400);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         context.assertEquals(0L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
@@ -242,13 +323,13 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
         context.assertFalse(jedis.hexists(getLocksRedisKey(), queueName));
 
-        given().body(queueItemValid).when().put("/queuing/enqueue/"+queueName+"/?locked").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().put("/queuing/enqueue/" + queueName + "/?locked").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
         context.assertTrue(jedis.hexists(getLocksRedisKey(), queueName));
         assertLockContent(context, queueName, "Unknown");
 
-        given().body(queueItemValid).when().put("/queuing/enqueue/"+queueName+"/?locked").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().put("/queuing/enqueue/" + queueName + "/?locked").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(2L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
@@ -270,7 +351,7 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
                 .header("x-rp-usr", requestedBy)
                 .body(queueItemValid)
                 .when()
-                .put("/queuing/enqueue/"+queueName+"/?locked")
+                .put("/queuing/enqueue/" + queueName + "/?locked")
                 .then().assertThat().statusCode(200);
 
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
@@ -290,7 +371,7 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
         context.assertFalse(jedis.hexists(getLocksRedisKey(), queueName));
 
-        given().body(queueItemInvalid).when().put("/queuing/enqueue/"+queueName+"/?locked").then().assertThat().statusCode(400);
+        given().body(queueItemInvalid).when().put("/queuing/enqueue/" + queueName + "/?locked").then().assertThat().statusCode(400);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         context.assertEquals(0L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
@@ -307,11 +388,11 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
 
-        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
-        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(2L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
@@ -326,7 +407,7 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
 
-        given().body(queueItemInvalid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(400);
+        given().body(queueItemInvalid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(400);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         context.assertEquals(0L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
@@ -343,7 +424,7 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
 
         // try to get with non-numeric index
         String nonnumericIndex = "xx";
-        when().get("/queuing/queues/"+queueName+"/"+nonnumericIndex).then().assertThat().statusCode(405);
+        when().get("/queuing/queues/" + queueName + "/" + nonnumericIndex).then().assertThat().statusCode(405);
 
         async.complete();
     }
@@ -358,7 +439,7 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
 
         // try to get with not existing index
         String notExistingIndex = "10";
-        when().get("/queuing/queues/"+queueName+"/"+notExistingIndex).then().assertThat().statusCode(404).body(containsString("Not Found"));
+        when().get("/queuing/queues/" + queueName + "/" + notExistingIndex).then().assertThat().statusCode(404).body(containsString("Not Found"));
 
         async.complete();
     }
@@ -371,12 +452,12 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
 
-        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
         String numericIndex = "0";
-        when().get("/queuing/queues/"+queueName+"/"+numericIndex).then().assertThat()
+        when().get("/queuing/queues/" + queueName + "/" + numericIndex).then().assertThat()
                 .statusCode(200)
                 .header("content-type", "application/json")
                 .body(equalTo(new JsonObject(queueItemValid).toString()));
@@ -392,22 +473,22 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
 
-        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
-        given().body(queueItemValid2).when().put("/queuing/queues/"+queueName+"/0").then().assertThat().statusCode(409).body(containsString("Queue must be locked to perform this operation"));
+        given().body(queueItemValid2).when().put("/queuing/queues/" + queueName + "/0").then().assertThat().statusCode(409).body(containsString("Queue must be locked to perform this operation"));
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
         // check queue item has not been replaced
-        when().get("/queuing/queues/"+queueName+"/0").then().assertThat()
+        when().get("/queuing/queues/" + queueName + "/0").then().assertThat()
                 .statusCode(200)
                 .header("content-type", "application/json")
                 .body(equalTo(new JsonObject(queueItemValid).toString()));
 
         // replacing with an invalid resource
-        given().body(queueItemInvalid).when().put("/queuing/queues/"+queueName+"/0").then().assertThat().statusCode(409).body(containsString("Queue must be locked to perform this operation"));
+        given().body(queueItemInvalid).when().put("/queuing/queues/" + queueName + "/0").then().assertThat().statusCode(409).body(containsString("Queue must be locked to perform this operation"));
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
@@ -425,16 +506,16 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         // lock queue
         given().body("{}").when().put("/queuing/locks/" + queueName).then().assertThat().statusCode(200);
 
-        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
-        given().body(queueItemInvalid).when().put("/queuing/queues/"+queueName+"/0").then().assertThat().statusCode(400);
+        given().body(queueItemInvalid).when().put("/queuing/queues/" + queueName + "/0").then().assertThat().statusCode(400);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
         // check queue item has not been replaced
-        when().get("/queuing/queues/"+queueName+"/0").then().assertThat()
+        when().get("/queuing/queues/" + queueName + "/0").then().assertThat()
                 .statusCode(200)
                 .header("content-type", "application/json")
                 .body(equalTo(new JsonObject(queueItemValid).toString()));
@@ -453,16 +534,16 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         // lock queue
         given().body("{}").when().put("/queuing/locks/" + queueName).then().assertThat().statusCode(200);
 
-        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
-        given().body(queueItemValid2).when().put("/queuing/queues/"+queueName+"/10").then().assertThat().statusCode(404).body(containsString("Not Found"));
+        given().body(queueItemValid2).when().put("/queuing/queues/" + queueName + "/10").then().assertThat().statusCode(404).body(containsString("Not Found"));
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
         // check queue item has not been replaced
-        when().get("/queuing/queues/"+queueName+"/0").then().assertThat()
+        when().get("/queuing/queues/" + queueName + "/0").then().assertThat()
                 .statusCode(200)
                 .header("content-type", "application/json")
                 .body(equalTo(new JsonObject(queueItemValid).toString()));
@@ -481,16 +562,16 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         // lock queue
         given().body("{}").when().put("/queuing/locks/" + queueName).then().assertThat().statusCode(200);
 
-        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
-        given().body(queueItemValid2).when().put("/queuing/queues/"+queueName+"/0").then().assertThat().statusCode(200);
+        given().body(queueItemValid2).when().put("/queuing/queues/" + queueName + "/0").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
         // check queue item has not been replaced
-        when().get("/queuing/queues/"+queueName+"/0").then().assertThat()
+        when().get("/queuing/queues/" + queueName + "/0").then().assertThat()
                 .statusCode(200)
                 .header("content-type", "application/json")
                 .body(equalTo(new JsonObject(queueItemValid2).toString()));
@@ -506,13 +587,13 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
 
-        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
         // try to delete with non-numeric index
         String nonnumericIndex = "xx";
-        when().delete("/queuing/queues/"+queueName+"/"+nonnumericIndex).then().assertThat().statusCode(405);
+        when().delete("/queuing/queues/" + queueName + "/" + nonnumericIndex).then().assertThat().statusCode(405);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
@@ -527,12 +608,12 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         assertKeyCount(context, getQueuesRedisKeyPrefix() + queueName, 0);
 
-        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
         String numericIndex = "22";
-        when().delete("/queuing/queues/"+queueName+"/"+numericIndex).then().assertThat().statusCode(409).body(containsString("Queue must be locked to perform this operation"));
+        when().delete("/queuing/queues/" + queueName + "/" + numericIndex).then().assertThat().statusCode(409).body(containsString("Queue must be locked to perform this operation"));
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
@@ -550,12 +631,12 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         // lock queue
         given().body("{}").when().put("/queuing/locks/" + queueName).then().assertThat().statusCode(200);
 
-        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
         String numericIndex = "22";
-        when().delete("/queuing/queues/"+queueName+"/"+numericIndex).then().assertThat().statusCode(404).body(containsString("Not Found"));
+        when().delete("/queuing/queues/" + queueName + "/" + numericIndex).then().assertThat().statusCode(404).body(containsString("Not Found"));
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
@@ -573,17 +654,17 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
         // lock queue
         given().body("{}").when().put("/queuing/locks/" + queueName).then().assertThat().statusCode(200);
 
-        given().body(queueItemValid).when().post("/queuing/queues/"+queueName+"/").then().assertThat().statusCode(200);
+        given().body(queueItemValid).when().post("/queuing/queues/" + queueName + "/").then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
         context.assertEquals(1L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
         String numericIndex = "0";
-        when().delete("/queuing/queues/"+queueName+"/"+numericIndex).then().assertThat().statusCode(200);
+        when().delete("/queuing/queues/" + queueName + "/" + numericIndex).then().assertThat().statusCode(200);
         assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
         context.assertEquals(0L, jedis.llen(getQueuesRedisKeyPrefix() + queueName));
 
         // try to delete again
-        when().delete("/queuing/queues/"+queueName+"/"+numericIndex).then().assertThat().statusCode(404).body(containsString("Not Found"));
+        when().delete("/queuing/queues/" + queueName + "/" + numericIndex).then().assertThat().statusCode(404).body(containsString("Not Found"));
 
         async.complete();
     }
