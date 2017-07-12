@@ -8,17 +8,17 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /**
- * Tests for {@link Timer} class.
+ * Tests for {@link RedisQuesTimer} class.
  *
  * @author https://github.com/mcweba [Marc-Andre Weber]
  */
 @RunWith(VertxUnitRunner.class)
-public class TimerTest {
+public class RedisQuesTimerTest {
 
     @Test
     public void testExecuteDelayedLong(TestContext context){
         Async async = context.async();
-        Timer timer = new Timer(Vertx.vertx());
+        RedisQuesTimer timer = new RedisQuesTimer(Vertx.vertx());
         final int delayMs = 1500;
         final long start = System.currentTimeMillis();
 
@@ -35,7 +35,7 @@ public class TimerTest {
     @Test
     public void testExecuteDelayedShort(TestContext context){
         Async async = context.async();
-        Timer timer = new Timer(Vertx.vertx());
+        RedisQuesTimer timer = new RedisQuesTimer(Vertx.vertx());
         final int delayMs = 50;
         final long start = System.currentTimeMillis();
 
@@ -52,7 +52,7 @@ public class TimerTest {
     @Test
     public void testExecuteDelayedZero(TestContext context){
         Async async = context.async();
-        Timer timer = new Timer(Vertx.vertx());
+        RedisQuesTimer timer = new RedisQuesTimer(Vertx.vertx());
         final int delayMs = 0;
         final long start = System.currentTimeMillis();
 

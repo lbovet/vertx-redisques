@@ -20,7 +20,7 @@ import io.vertx.redis.op.RangeLimitOptions;
 import org.swisspush.redisques.handler.*;
 import org.swisspush.redisques.lua.LuaScriptManager;
 import org.swisspush.redisques.util.RedisquesConfiguration;
-import org.swisspush.redisques.util.Timer;
+import org.swisspush.redisques.util.RedisQuesTimer;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,6 +29,8 @@ import java.util.stream.Collectors;
 import static org.swisspush.redisques.util.RedisquesAPI.*;
 
 public class RedisQues extends AbstractVerticle {
+
+    private static final String UPDATE_ADDRESS = "redisques.configuration-updated";
 
     // State of each queue. Consuming means there is a message being processed.
     private enum QueueState {
@@ -96,7 +98,7 @@ public class RedisQues extends AbstractVerticle {
     private int processorTimeout = 240000;
 
     private long processorDelayMax;
-    private Timer timer;
+    private RedisQuesTimer timer;
 
     private String redisHost;
     private int redisPort;
@@ -153,7 +155,7 @@ public class RedisQues extends AbstractVerticle {
         checkInterval = modConfig.getCheckInterval();
         processorTimeout = modConfig.getProcessorTimeout();
         processorDelayMax = modConfig.getProcessorDelayMax();
-        timer = new Timer(vertx);
+        timer = new RedisQuesTimer(vertx);
 
         redisHost = modConfig.getRedisHost();
         redisPort = modConfig.getRedisPort();
@@ -172,6 +174,11 @@ public class RedisQues extends AbstractVerticle {
         this.luaScriptManager = new LuaScriptManager(redisClient);
 
         RedisquesHttpRequestHandler.init(vertx, modConfig);
+
+        eb.consumer(UPDATE_ADDRESS, (Handler<Message<JsonObject>>) event -> {
+            log.info("Received configurations update");
+            setConfigurationValues(event.body(), false);
+        });
 
         // Handles operations
         eb.localConsumer(address, (Handler<Message<JsonObject>>) event -> {
@@ -435,28 +442,45 @@ public class RedisQues extends AbstractVerticle {
 
     private void setConfiguration(Message<JsonObject> event) {
         JsonObject configurationValues = event.body().getJsonObject(PAYLOAD);
+        setConfigurationValues(configurationValues, true).setHandler(setConfigurationValuesEvent -> {
+            if(setConfigurationValuesEvent.succeeded()){
+                vertx.eventBus().publish(UPDATE_ADDRESS, configurationValues);
+                event.reply(setConfigurationValuesEvent.result());
+            } else {
+                event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, setConfigurationValuesEvent.cause().getMessage()));
+            }
+        });
+    }
+
+    private Future<JsonObject> setConfigurationValues(JsonObject configurationValues, boolean validateOnly){
+        Future<JsonObject> future = Future.future();
+
         if (configurationValues != null) {
             List<String> notAllowedConfigurationValues = findNotAllowedConfigurationValues(configurationValues.fieldNames());
             if(notAllowedConfigurationValues.isEmpty()){
                 try {
                     Long processorDelayMaxValue = configurationValues.getLong(PROCESSOR_DELAY_MAX);
                     if(processorDelayMaxValue == null){
-                        event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, "Value for configuration property '"+PROCESSOR_DELAY_MAX+"' is missing"));
-                        return;
+                        future.fail("Value for configuration property '"+PROCESSOR_DELAY_MAX+"' is missing");
+                        return future;
                     }
-                    this.processorDelayMax = processorDelayMaxValue;
-                    log.info("Updated configuration value of property '"+PROCESSOR_DELAY_MAX+"' to " + processorDelayMaxValue);
-                    event.reply(new JsonObject().put(STATUS, OK));
+                    if(!validateOnly) {
+                        this.processorDelayMax = processorDelayMaxValue;
+                        log.info("Updated configuration value of property '" + PROCESSOR_DELAY_MAX + "' to " + processorDelayMaxValue);
+                    }
+                    future.complete(new JsonObject().put(STATUS, OK));
                 } catch(ClassCastException ex){
-                    event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, "Value for configuration property '"+PROCESSOR_DELAY_MAX+"' is not a number"));
+                    future.fail("Value for configuration property '"+PROCESSOR_DELAY_MAX+"' is not a number");
                 }
             } else {
                 String notAllowedConfigurationValuesString = Joiner.on(", ").join(notAllowedConfigurationValues);
-                event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, "Not supported configuration values received: " + notAllowedConfigurationValuesString));
+                future.fail("Not supported configuration values received: " + notAllowedConfigurationValuesString);
             }
         } else {
-            event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, "Configuration values missing"));
+            future.fail("Configuration values missing");
         }
+
+        return future;
     }
 
     private List<String> findNotAllowedConfigurationValues(Set<String> configurationValues) {
@@ -711,6 +735,9 @@ public class RedisQues extends AbstractVerticle {
     }
 
     private void processMessageWithTimeout(final String queue, final String payload, final Handler<SendResult> handler) {
+        if(processorDelayMax > 0){
+            log.info("About to process message for queue " + queue + " with a maximum delay of " + processorDelayMax + "ms");
+        }
         timer.executeDelayedMax(processorDelayMax).setHandler(delayed -> {
             if (delayed.failed()) {
                 log.error("Delayed execution has failed. Cause: " + delayed.cause().getMessage());

@@ -2,6 +2,8 @@ package org.swisspush.redisques.util;
 
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 
 import java.util.Random;
 
@@ -10,11 +12,13 @@ import java.util.Random;
  *
  * @author https://github.com/mcweba [Marc-Andre Weber]
  */
-public class Timer {
+public class RedisQuesTimer {
     private final Vertx vertx;
     private Random random;
 
-    public Timer(Vertx vertx) {
+    private Logger log = LoggerFactory.getLogger(RedisQuesTimer.class);
+
+    public RedisQuesTimer(Vertx vertx) {
         this.vertx = vertx;
         this.random = new Random();
     }
@@ -30,7 +34,9 @@ public class Timer {
         Future<Void> future = Future.future();
 
         if (delayMs > 0) {
-            vertx.setTimer(random.nextInt((int) (delayMs + 1)) + 1, delayed -> future.complete());
+            int delay = random.nextInt((int) (delayMs + 1)) + 1;
+            log.debug("starting timer with a delay of " + delay + "ms");
+            vertx.setTimer(delay, delayed -> future.complete());
         } else {
             future.complete();
         }
