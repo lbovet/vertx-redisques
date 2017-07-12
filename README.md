@@ -47,6 +47,7 @@ The following configuration values are available:
 | Property | Default value | Description |
 |:--------- | :----------- | :----------- |
 | address | redisques | The eventbus address the redisques module is listening to |
+| configuration-updated-address | redisques-configuration-updated | The eventbus address the redisques module publishes the configuration updates to |
 | redis-prefix | redisques: | Prefix for redis keys holding queues and consumers |
 | processor-address | redisques-processor | Address of message processors |
 | refresh-period | 10 | The frequency [s] of consumers refreshing their subscriptions to consume |
@@ -537,6 +538,7 @@ The result will be a json object with the configuration values like the example 
     "redisHost": "localhost",
     "checkInterval": 10,
     "address": "redisques",
+    "configuration-updated-address": "redisques-configuration-updated",
     "httpRequestHandlerEnabled": true,
     "redis-prefix": "redisques:",
     "processorTimeout": 240000,

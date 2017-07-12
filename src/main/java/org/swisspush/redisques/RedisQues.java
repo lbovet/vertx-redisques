@@ -30,8 +30,6 @@ import static org.swisspush.redisques.util.RedisquesAPI.*;
 
 public class RedisQues extends AbstractVerticle {
 
-    private static final String UPDATE_ADDRESS = "redisques.configuration-updated";
-
     // State of each queue. Consuming means there is a message being processed.
     private enum QueueState {
         READY, CONSUMING
@@ -56,6 +54,8 @@ public class RedisQues extends AbstractVerticle {
     // Address of this redisques. Also used as prefix for consumer broadcast
     // address.
     private String address = "redisques";
+
+    private String configurationUpdatedAddress = "redisques-configuration-updated";
 
     // Address of the redis mod
     private RedisClient redisClient;
@@ -149,6 +149,7 @@ public class RedisQues extends AbstractVerticle {
         log.info("Starting Redisques module with configuration: " + modConfig);
 
         address = modConfig.getAddress();
+        configurationUpdatedAddress = modConfig.getConfigurationUpdatedAddress();
         redisPrefix = modConfig.getRedisPrefix();
         processorAddress = modConfig.getProcessorAddress();
         refreshPeriod = modConfig.getRefreshPeriod();
@@ -175,7 +176,7 @@ public class RedisQues extends AbstractVerticle {
 
         RedisquesHttpRequestHandler.init(vertx, modConfig);
 
-        eb.consumer(UPDATE_ADDRESS, (Handler<Message<JsonObject>>) event -> {
+        eb.consumer(configurationUpdatedAddress, (Handler<Message<JsonObject>>) event -> {
             log.info("Received configurations update");
             setConfigurationValues(event.body(), false);
         });
@@ -444,7 +445,8 @@ public class RedisQues extends AbstractVerticle {
         JsonObject configurationValues = event.body().getJsonObject(PAYLOAD);
         setConfigurationValues(configurationValues, true).setHandler(setConfigurationValuesEvent -> {
             if(setConfigurationValuesEvent.succeeded()){
-                vertx.eventBus().publish(UPDATE_ADDRESS, configurationValues);
+                log.debug("About to publish the configuration updates to event bus address '"+configurationUpdatedAddress+"'");
+                vertx.eventBus().publish(configurationUpdatedAddress, configurationValues);
                 event.reply(setConfigurationValuesEvent.result());
             } else {
                 event.reply(new JsonObject().put(STATUS, ERROR).put(MESSAGE, setConfigurationValuesEvent.cause().getMessage()));

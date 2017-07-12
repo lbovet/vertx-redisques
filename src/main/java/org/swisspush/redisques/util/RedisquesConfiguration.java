@@ -11,6 +11,7 @@ import io.vertx.core.logging.LoggerFactory;
  */
 public class RedisquesConfiguration {
     private String address;
+    private String configurationUpdatedAddress;
     private String redisPrefix;
     private String processorAddress;
     private int refreshPeriod;
@@ -29,6 +30,7 @@ public class RedisquesConfiguration {
     private static final long DEFAULT_PROCESSOR_DELAY_MAX = 0;
 
     public static final String PROP_ADDRESS = "address";
+    public static final String PROP_CONFIGURATION_UPDATED_ADDRESS = "configuration-updated-address";
     public static final String PROP_REDIS_PREFIX = "redis-prefix";
     public static final String PROP_PROCESSOR_ADDRESS = "processor-address";
     public static final String PROP_REFRESH_PERIOD = "refresh-period";
@@ -51,34 +53,13 @@ public class RedisquesConfiguration {
         this(new RedisquesConfigurationBuilder());
     }
 
-    public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
-                                  String redisHost, int redisPort, String redisEncoding, int processorTimeout) {
-
-        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, DEFAULT_CHECK_INTERVAL, processorTimeout);
-    }
-
-    public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
-                                  String redisHost, int redisPort, String redisEncoding, int checkInterval, int processorTimeout) {
-        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding, checkInterval,
-                processorTimeout, false, "", null, null);
-    }
-
-    public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
-                                  String redisHost, int redisPort, String redisEncoding, int checkInterval,
-                                  int processorTimeout, boolean httpRequestHandlerEnabled,
-                                  String httpRequestHandlerPrefix, Integer httpRequestHandlerPort,
-                                  String httpRequestHandlerUserHeader) {
-        this(address, redisPrefix, processorAddress, refreshPeriod, redisHost, redisPort, redisEncoding,
-                checkInterval, processorTimeout, DEFAULT_PROCESSOR_DELAY_MAX, httpRequestHandlerEnabled, httpRequestHandlerPrefix,
-                httpRequestHandlerPort, httpRequestHandlerUserHeader);
-    }
-
-    public RedisquesConfiguration(String address, String redisPrefix, String processorAddress, int refreshPeriod,
+    public RedisquesConfiguration(String address, String configurationUpdatedAddress, String redisPrefix, String processorAddress, int refreshPeriod,
                                   String redisHost, int redisPort, String redisEncoding, int checkInterval,
                                   int processorTimeout, long processorDelayMax, boolean httpRequestHandlerEnabled,
                                   String httpRequestHandlerPrefix, Integer httpRequestHandlerPort,
                                   String httpRequestHandlerUserHeader) {
         this.address = address;
+        this.configurationUpdatedAddress = configurationUpdatedAddress;
         this.redisPrefix = redisPrefix;
         this.processorAddress = processorAddress;
         this.refreshPeriod = refreshPeriod;
@@ -115,7 +96,7 @@ public class RedisquesConfiguration {
     }
 
     private RedisquesConfiguration(RedisquesConfigurationBuilder builder){
-        this(builder.address, builder.redisPrefix, builder.processorAddress, builder.refreshPeriod,
+        this(builder.address, builder.configurationUpdatedAddress, builder.redisPrefix, builder.processorAddress, builder.refreshPeriod,
                 builder.redisHost, builder.redisPort, builder.redisEncoding, builder.checkInterval,
                 builder.processorTimeout, builder.processorDelayMax, builder.httpRequestHandlerEnabled, builder.httpRequestHandlerPrefix,
                 builder.httpRequestHandlerPort, builder.httpRequestHandlerUserHeader);
@@ -124,6 +105,7 @@ public class RedisquesConfiguration {
     public JsonObject asJsonObject(){
         JsonObject obj = new JsonObject();
         obj.put(PROP_ADDRESS, getAddress());
+        obj.put(PROP_CONFIGURATION_UPDATED_ADDRESS, getConfigurationUpdatedAddress());
         obj.put(PROP_REDIS_PREFIX, getRedisPrefix());
         obj.put(PROP_PROCESSOR_ADDRESS, getProcessorAddress());
         obj.put(PROP_REFRESH_PERIOD, getRefreshPeriod());
@@ -144,6 +126,9 @@ public class RedisquesConfiguration {
         RedisquesConfigurationBuilder builder = RedisquesConfiguration.with();
         if(json.containsKey(PROP_ADDRESS)){
             builder.address(json.getString(PROP_ADDRESS));
+        }
+        if(json.containsKey(PROP_CONFIGURATION_UPDATED_ADDRESS)){
+            builder.configurationUpdatedAddress(json.getString(PROP_CONFIGURATION_UPDATED_ADDRESS));
         }
         if(json.containsKey(PROP_REDIS_PREFIX)){
             builder.redisPrefix(json.getString(PROP_REDIS_PREFIX));
@@ -187,9 +172,9 @@ public class RedisquesConfiguration {
         return builder.build();
     }
 
-    public String getAddress() {
-        return address;
-    }
+    public String getAddress() { return address; }
+
+    public String getConfigurationUpdatedAddress() { return configurationUpdatedAddress; }
 
     public String getRedisPrefix() {
         return redisPrefix;
@@ -254,6 +239,7 @@ public class RedisquesConfiguration {
      */
     public static class RedisquesConfigurationBuilder {
         private String address;
+        private String configurationUpdatedAddress;
         private String redisPrefix;
         private String processorAddress;
         private int refreshPeriod;
@@ -270,6 +256,7 @@ public class RedisquesConfiguration {
 
         public RedisquesConfigurationBuilder(){
             this.address = "redisques";
+            this.configurationUpdatedAddress = "redisques-configuration-updated";
             this.redisPrefix = "redisques:";
             this.processorAddress = "redisques-processor";
             this.refreshPeriod = 10;
@@ -287,6 +274,11 @@ public class RedisquesConfiguration {
 
         public RedisquesConfigurationBuilder address(String address){
             this.address = address;
+            return this;
+        }
+
+        public RedisquesConfigurationBuilder configurationUpdatedAddress(String configurationUpdatedAddress){
+            this.configurationUpdatedAddress = configurationUpdatedAddress;
             return this;
         }
 

@@ -20,6 +20,7 @@ public class RedisquesConfigurationTest {
     public void testDefaultConfiguration(TestContext testContext){
         RedisquesConfiguration config = new RedisquesConfiguration();
         testContext.assertEquals(config.getAddress(), "redisques");
+        testContext.assertEquals(config.getConfigurationUpdatedAddress(), "redisques-configuration-updated");
         testContext.assertEquals(config.getRedisPrefix(), "redisques:");
         testContext.assertEquals(config.getProcessorAddress(), "redisques-processor");
         testContext.assertEquals(config.getRefreshPeriod(), 10);
@@ -39,6 +40,7 @@ public class RedisquesConfigurationTest {
     public void testOverrideConfiguration(TestContext testContext){
         RedisquesConfiguration config = with()
                 .address("new_address")
+                .configurationUpdatedAddress("config_updated")
                 .redisHost("anotherhost")
                 .redisPort(1234)
                 .checkInterval(5)
@@ -58,6 +60,7 @@ public class RedisquesConfigurationTest {
 
         // overridden values
         testContext.assertEquals(config.getAddress(), "new_address");
+        testContext.assertEquals(config.getConfigurationUpdatedAddress(), "config_updated");
         testContext.assertEquals(config.getRedisHost(), "anotherhost");
         testContext.assertEquals(config.getRedisPort(), 1234);
         testContext.assertEquals(config.getCheckInterval(), 5);
@@ -75,6 +78,7 @@ public class RedisquesConfigurationTest {
         JsonObject json = config.asJsonObject();
 
         testContext.assertEquals(json.getString(PROP_ADDRESS), "redisques");
+        testContext.assertEquals(json.getString(PROP_CONFIGURATION_UPDATED_ADDRESS), "redisques-configuration-updated");
         testContext.assertEquals(json.getString(PROP_REDIS_PREFIX), "redisques:");
         testContext.assertEquals(json.getString(PROP_PROCESSOR_ADDRESS), "redisques-processor");
         testContext.assertEquals(json.getInteger(PROP_REFRESH_PERIOD), 10);
@@ -95,6 +99,7 @@ public class RedisquesConfigurationTest {
 
         RedisquesConfiguration config = with()
                 .address("new_address")
+                .configurationUpdatedAddress("config_updated")
                 .redisHost("anotherhost")
                 .redisPort(1234)
                 .checkInterval(5)
@@ -116,6 +121,7 @@ public class RedisquesConfigurationTest {
 
         // overridden values
         testContext.assertEquals(json.getString(PROP_ADDRESS), "new_address");
+        testContext.assertEquals(json.getString(PROP_CONFIGURATION_UPDATED_ADDRESS), "config_updated");
         testContext.assertEquals(json.getString(PROP_REDIS_HOST), "anotherhost");
         testContext.assertEquals(json.getInteger(PROP_REDIS_PORT), 1234);
         testContext.assertEquals(json.getInteger(PROP_CHECK_INTERVAL), 5);
@@ -131,6 +137,7 @@ public class RedisquesConfigurationTest {
         RedisquesConfiguration config = fromJsonObject(json);
 
         testContext.assertEquals(config.getAddress(), "redisques");
+        testContext.assertEquals(config.getConfigurationUpdatedAddress(), "redisques-configuration-updated");
         testContext.assertEquals(config.getRedisPrefix(), "redisques:");
         testContext.assertEquals(config.getProcessorAddress(), "redisques-processor");
         testContext.assertEquals(config.getRefreshPeriod(), 10);
@@ -151,6 +158,7 @@ public class RedisquesConfigurationTest {
 
         JsonObject json = new JsonObject();
         json.put(PROP_ADDRESS, "new_address");
+        json.put(PROP_CONFIGURATION_UPDATED_ADDRESS, "config_updated");
         json.put(PROP_REDIS_PREFIX, "new_redis-prefix");
         json.put(PROP_PROCESSOR_ADDRESS, "new_processor-address");
         json.put(PROP_REFRESH_PERIOD, 99);
@@ -167,6 +175,7 @@ public class RedisquesConfigurationTest {
 
         RedisquesConfiguration config = fromJsonObject(json);
         testContext.assertEquals(config.getAddress(), "new_address");
+        testContext.assertEquals(config.getConfigurationUpdatedAddress(), "config_updated");
         testContext.assertEquals(config.getRedisPrefix(), "new_redis-prefix");
         testContext.assertEquals(config.getProcessorAddress(), "new_processor-address");
         testContext.assertEquals(config.getRefreshPeriod(), 99);
