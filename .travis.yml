@@ -3,8 +3,7 @@ jdk:
   - oraclejdk8
 services:
    - redis-server
-script: 
-   - ./gradlew test
-   - ./gradlew jacocoTestReport
+install:
+    - mvn install
 after_success:
   - bash <(curl -s https://codecov.io/bash)
