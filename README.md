@@ -17,7 +17,7 @@ A highly scalable redis-persistent queuing system for vert.x.
   * [Other](http://redis.io/download)
 
 ### Build
-You need Java 8 and gradle.
+You need Java 8 and Maven.
 ```
 cd vertx-redisques
 gradle build
