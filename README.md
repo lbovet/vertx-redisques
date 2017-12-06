@@ -736,13 +736,5 @@ To delete a single lock use
 
 Redisques versions greater than 01.00.17 depend on Vert.x v3.2.0 and therefore require Java 8.
 
-## Use gradle with alternative repositories
-
-As standard the default maven repositories are set.
-You can overwrite these repositories by setting these properties (`-Pproperty=value`):
-* `repository` this is the repository where resources are fetched
-* `uploadRepository` the repository used in `uploadArchives`
-* `repoUsername` the username for uploading archives
-* `repoPassword` the password for uploading archives
 
 [![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/lbovet/vertx-redisques/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
