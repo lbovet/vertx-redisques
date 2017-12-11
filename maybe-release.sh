@@ -1,6 +1,6 @@
 #!/bin/bash
 set -ev
-if [ "$TRAVIS_BRANCH" == "maven-build" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_REPO_SLUG" == "swisspush/vertx-redisques" ]
+if [ "$TRAVIS_BRANCH" == "master" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_REPO_SLUG" == "swisspush/vertx-redisques" ]
 then
     git reset --hard
     git clean -fd
