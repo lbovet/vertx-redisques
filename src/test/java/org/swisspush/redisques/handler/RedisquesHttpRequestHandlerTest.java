@@ -182,6 +182,7 @@ public class RedisquesHttpRequestHandlerTest extends AbstractTestCase {
 
     @Test
     @Ignore
+    // TODO: investivate why this test fails on travis
     public void setConfiguration(TestContext context) {
         when()
                 .get("/queuing/configuration/")

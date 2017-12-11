@@ -5,5 +5,7 @@ services:
    - redis-server
 install:
     - mvn install -Dmaven.javadoc.skip=true -B -V
+script:
+   - ./maybe-release.sh
 after_success:
   - bash <(curl -s https://codecov.io/bash)
