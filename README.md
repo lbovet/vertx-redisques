@@ -1,9 +1,27 @@
 # vertx-redisques
 
-[![Build Status](https://drone.io/github.com/swisspush/vertx-redisques/status.png)](https://drone.io/github.com/swisspush/vertx-redisques/latest)
+[![Build Status](https://travis-ci.org/swisspush/vertx-redisques.svg?branch=master)](https://travis-ci.org/swisspush/vertx-redisques)
+[![codecov](https://codecov.io/gh/swisspush/vertx-redisques/branch/master/graph/badge.svg)](https://codecov.io/gh/swisspush/vertx-redisques)
 [![Maven Central](https://img.shields.io/maven-central/v/org.swisspush/redisques.svg)](http://search.maven.org/#artifactdetails|org.swisspush|redisques|2.2.0|)
 
 A highly scalable redis-persistent queuing system for vert.x.
+
+## Getting Started
+### Install
+* Clone this repository or unzip [archive](https://github.com/swisspush/vertx-redisques/archive/master.zip)
+* Install and start Redis
+  * Debian/Ubuntu: `apt-get install redis-server`
+  * Fedora/RedHat/CentOS: `yum install redis`
+  * OS X: `brew install redis`
+  * [Windows](https://github.com/MSOpenTech/redis/releases/download/win-2.8.2400/Redis-x64-2.8.2400.zip)
+  * [Other](http://redis.io/download)
+
+### Build
+You need Java 8 and Maven.
+```
+cd vertx-redisques
+mvn clean install
+```
 
 ## Dynamic Queues
 
@@ -29,9 +47,11 @@ The following configuration values are available:
 | Property | Default value | Description |
 |:--------- | :----------- | :----------- |
 | address | redisques | The eventbus address the redisques module is listening to |
+| configuration-updated-address | redisques-configuration-updated | The eventbus address the redisques module publishes the configuration updates to |
 | redis-prefix | redisques: | Prefix for redis keys holding queues and consumers |
 | processor-address | redisques-processor | Address of message processors |
 | refresh-period | 10 | The frequency [s] of consumers refreshing their subscriptions to consume |
+| processorDelayMax | 0 | The maximum delay [ms] to wait between queue items before notify the consumer |
 | redisHost | localhost | The host where redis is running on |
 | redisPort | 6379 | The port where redis is running on |
 | redisEncoding | UTF-8 | The encoding to use in redis |
@@ -43,7 +63,7 @@ The following configuration values are available:
 
 ### Configuration util
 
-The configurations have to be passed as JsonObject to the module. For a simplyfied configuration the _RedisquesConfigurationBuilder_ can be used.
+The configurations have to be passed as JsonObject to the module. For a simplified configuration the _RedisquesConfigurationBuilder_ can be used.
 
 Example:
 
@@ -56,7 +76,7 @@ RedisquesConfiguration config = RedisquesConfiguration.with()
 JsonObject json = config.asJsonObject();
 ```
 
-Properties not overriden will not be changed. Thus remaining default.
+Properties not overridden will not be changed. Thus remaining default.
 
 To use default values only, the _RedisquesConfiguration_ constructor without parameters can be used:
 
@@ -73,7 +93,7 @@ Redisques API for Vert.x - Eventbus
 > address = redisque
 
 ### RedisquesAPI util
-For a simplyfied working with the Redisques module, see the RedisquesAPI class:
+For a simplified working with the Redisques module, see the RedisquesAPI class:
 
 > org.swisspush.redisques.util.RedisquesAPI
 
@@ -81,6 +101,49 @@ This class provides utility methods for a simple configuration of the queue oper
 
 ### Queue operations
 The following operations are available in the Redisques module.
+
+#### getConfiguration
+
+Request Data
+
+```
+{
+    "operation": "getConfiguration"
+}
+```
+
+Response Data
+
+```
+{
+    "status": "ok" / "error",
+    "value": <obj RESULT>
+}
+```
+
+#### setConfiguration
+
+Request Data
+
+```
+{
+    "operation": "setConfiguration",
+    "payload": {
+        "<str propertyName>": <str propertyValue>,
+        "<str property2Name>": <str property2Value>,
+        "<str property3Name>": <str property3Value>
+    }    
+}
+```
+
+Response Data
+
+```
+{
+    "status": "ok" / "error",
+    "message": <string error message when status=error>
+}
+```
 
 #### enqueue
 
@@ -102,6 +165,31 @@ Request Data
 
 Response Data
 
+```
+{
+    "status": "ok" / "error",
+    "message": "enqueued" / <str RESULT>
+}
+```
+
+#### lockedEnqueue
+Request Data
+
+```
+{
+    "operation": "lockedEnqueue",
+    "payload": {
+        "queuename": <str QUEUENAME>,
+        "requestedBy": <str user who created the lock>
+    },
+    "message": {
+        "method": "POST",
+        "uri": <st REQUEST URI>,
+        "payload": null
+    }
+}
+```
+Response Data
 ```
 {
     "status": "ok" / "error",
@@ -322,7 +410,8 @@ Request Data
 {
     "operation": "deleteAllQueueItems",
     "payload": {
-        "queuename": <str QUEUENAME>
+        "queuename": <str QUEUENAME>,
+        "unlock": true/false
     }
 }
 ```
@@ -432,10 +521,52 @@ The result will be a json object with the available endpoints like the example b
   "queuing": [
     "locks/",
     "queues/",
-    "monitor/"
+    "monitor/",
+    "configuration/"
   ]
 }
 ```
+
+### Get configuration
+The configuration information contains the currently active configuration values. To get the configuration use
+> GET /queuing/configuration
+
+The result will be a json object with the configuration values like the example below
+
+```json
+{
+    "redisHost": "localhost",
+    "checkInterval": 10,
+    "address": "redisques",
+    "configuration-updated-address": "redisques-configuration-updated",
+    "httpRequestHandlerEnabled": true,
+    "redis-prefix": "redisques:",
+    "processorTimeout": 240000,
+    "processorDelayMax": 0,
+    "refresh-period": 10,
+    "httpRequestHandlerPrefix": "/queuing",
+    "redisEncoding": "UTF-8",
+    "httpRequestHandlerPort": 7070,
+    "httpRequestHandlerUserHeader": "x-rp-usr",
+    "redisPort": 6379,
+    "processor-address": "redisques-processor"
+}
+```
+
+### Set configuration
+To set the configuration use
+> POST /queuing/configuration
+
+having the payload in the request body. The current implementation supports the following configuration values only:
+```
+{
+  "processorDelayMax": 0 // number value in milliseconds 
+}
+```
+The following conditions will cause a _400 Bad Request_ response with a corresponding error message:
+* Body is not a valid json object
+* Body contains not supported configuration values
+* Body does not contain the _processorDelayMax_ property
 
 ### Get monitor information
 The monitor information contains the active queues and their queue items count. To get the monitor information use
@@ -461,6 +592,17 @@ The result will be a json object with the monitor information like the example b
   ]
 }
 ```
+
+### Enqueue
+To enqueue a new queue use
+> PUT /queuing/enqueue/myNewQueue
+
+having the payload in the request body. When the request body is not a valid json object, a statusCode 400 with the error message _'Bad Request'_ will be returned.
+
+Available url parameters are:
+* _locked_: Lock the queue before enqueuing to prevent processing
+
+When the _locked_ url parameter is set, the configured _httpRequestHandlerUserHeader_ property will be used to define the user which requested the lock. If no header is provided, "Unknown" will be used instead.
 
 ### List or count queues
 To list the active queues use
@@ -524,6 +666,9 @@ The result will be a json object with the count of queue items like the example 
 ### Delete all queue items
 To delete all queue items of a single queue use
 > DELETE /queuing/queues/myQueue
+
+Available url parameters are:
+* _unlock_: Unlock the queue after deleting all queue items
 
 ### Get single queue item
 To get a single queue item use
@@ -591,13 +736,5 @@ To delete a single lock use
 
 Redisques versions greater than 01.00.17 depend on Vert.x v3.2.0 and therefore require Java 8.
 
-## Use gradle with alternative repositories
-
-As standard the default maven repositories are set.
-You can overwrite these repositories by setting these properties (`-Pproperty=value`):
-* `repository` this is the repository where resources are fetched
-* `uploadRepository` the repository used in `uploadArchives`
-* `repoUsername` the username for uploading archives
-* `repoPassword` the password for uploading archives
 
 [![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/lbovet/vertx-redisques/trend.png)](https://bitdeli.com/free "Bitdeli Badge")

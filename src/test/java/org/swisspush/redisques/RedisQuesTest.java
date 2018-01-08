@@ -7,7 +7,7 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.Timeout;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.swisspush.redisques.util.RedisquesConfiguration;
@@ -25,8 +25,8 @@ public class RedisQuesTest extends AbstractTestCase {
     @Rule
     public Timeout rule = Timeout.seconds(5);
 
-    @BeforeClass
-    public static void deployRedisques(TestContext context) {
+    @Before
+    public void deployRedisques(TestContext context) {
         vertx = Vertx.vertx();
 
         JsonObject config = RedisquesConfiguration.with()
@@ -57,6 +57,80 @@ public class RedisQuesTest extends AbstractTestCase {
     }
 
     @Test
+    public void getConfiguration(TestContext context) {
+        Async async = context.async();
+        eventBusSend(buildGetConfigurationOperation(), message -> {
+            context.assertEquals(OK, message.result().body().getString(STATUS));
+            JsonObject configuration = message.result().body().getJsonObject(VALUE);
+            context.assertNotNull(configuration);
+
+            context.assertEquals(configuration.getString("address"), "redisques");
+            context.assertEquals(configuration.getString("processor-address"), "processor-address");
+
+            context.assertEquals(configuration.getString("redisHost"), "localhost");
+            context.assertEquals(configuration.getInteger("redisPort"), 6379);
+            context.assertEquals(configuration.getString("redis-prefix"), "redisques:");
+            context.assertEquals(configuration.getString("redisEncoding"), "ISO-8859-1");
+
+            context.assertEquals(configuration.getInteger("checkInterval"), 60);
+            context.assertEquals(configuration.getInteger("refresh-period"), 2);
+            context.assertEquals(configuration.getInteger("processorTimeout"), 240000);
+            context.assertEquals(configuration.getLong("processorDelayMax"), 0L);
+
+            context.assertFalse(configuration.getBoolean("httpRequestHandlerEnabled"));
+            context.assertEquals(configuration.getInteger("httpRequestHandlerPort"), 7070);
+            context.assertEquals(configuration.getString("httpRequestHandlerPrefix"), "/queuing");
+            context.assertEquals(configuration.getString("httpRequestHandlerUserHeader"), "x-rp-usr");
+
+            async.complete();
+        });
+    }
+
+    @Test
+    public void setConfigurationImplementedValuesOnly(TestContext context) {
+        Async async = context.async();
+        eventBusSend(buildOperation(QueueOperation.setConfiguration,
+                new JsonObject().put(PROCESSOR_DELAY_MAX, 99).put("redisHost", "anotherHost").put("redisPort", 1234)), message -> {
+            context.assertEquals(ERROR, message.result().body().getString(STATUS));
+            context.assertEquals("Not supported configuration values received: [redisHost, redisPort]", message.result().body().getString(MESSAGE));
+            async.complete();
+        });
+    }
+
+    @Test
+    public void setConfigurationWrongDataType(TestContext context) {
+        Async async = context.async();
+        eventBusSend(buildOperation(QueueOperation.setConfiguration,
+                new JsonObject().put(PROCESSOR_DELAY_MAX, "a_string_value")), message -> {
+            context.assertEquals(ERROR, message.result().body().getString(STATUS));
+            context.assertEquals("Value for configuration property '"+PROCESSOR_DELAY_MAX+"' is not a number", message.result().body().getString(MESSAGE));
+            async.complete();
+        });
+    }
+
+    @Test
+    public void setConfigurationProcessorDelayMax(TestContext context) {
+        Async async = context.async();
+        eventBusSend(buildGetConfigurationOperation(), getConfig -> {
+            context.assertEquals(OK, getConfig.result().body().getString(STATUS));
+            JsonObject configuration = getConfig.result().body().getJsonObject(VALUE);
+            context.assertNotNull(configuration);
+            context.assertEquals(configuration.getLong(PROCESSOR_DELAY_MAX), 0L);
+
+            eventBusSend(buildSetConfigurationOperation(new JsonObject().put(PROCESSOR_DELAY_MAX, 1234)), setConfig -> {
+                context.assertEquals(OK, setConfig.result().body().getString(STATUS));
+                eventBusSend(buildGetConfigurationOperation(), getConfigAgain -> {
+                    context.assertEquals(OK, getConfigAgain.result().body().getString(STATUS));
+                    JsonObject updatedConfig = getConfigAgain.result().body().getJsonObject(VALUE);
+                    context.assertNotNull(updatedConfig);
+                    context.assertEquals(updatedConfig.getLong(PROCESSOR_DELAY_MAX), 1234L);
+                    async.complete();
+                });
+            });
+        });
+    }
+
+    @Test
     public void enqueue(TestContext context) {
         Async async = context.async();
         flushAll();
@@ -65,6 +139,43 @@ public class RedisQuesTest extends AbstractTestCase {
             context.assertEquals(OK, message.result().body().getString(STATUS));
             context.assertEquals("helloEnqueue", jedis.lindex(getQueuesRedisKeyPrefix() + "queueEnqueue", 0));
             assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+            async.complete();
+        });
+    }
+
+    @Test
+    public void lockedEnqueue(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        eventBusSend(buildLockedEnqueueOperation("queueEnqueue", "helloEnqueue", "someuser"), message -> {
+            context.assertEquals(OK, message.result().body().getString(STATUS));
+            context.assertEquals("helloEnqueue", jedis.lindex(getQueuesRedisKeyPrefix() + "queueEnqueue", 0));
+            context.assertTrue(jedis.hexists(getLocksRedisKey(), "queueEnqueue"));
+            assertLockContent(context, "queueEnqueue", "someuser");
+            assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+            assertKeyCount(context, getLocksRedisKey(), 1);
+            async.complete();
+        });
+    }
+
+    @Test
+    public void lockedEnqueueMissingRequestedBy(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getLocksRedisKey(), 0);
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        context.assertFalse(jedis.hexists(getLocksRedisKey(), "queue1"));
+
+        JsonObject operation = buildOperation(QueueOperation.lockedEnqueue, new JsonObject().put(QUEUENAME, "queue1"));
+        operation.put(MESSAGE, "helloEnqueue");
+
+        eventBusSend(operation, message -> {
+            context.assertEquals(ERROR, message.result().body().getString(STATUS));
+            context.assertEquals("Property '"+REQUESTED_BY+"' missing", message.result().body().getString(MESSAGE));
+            assertKeyCount(context, getLocksRedisKey(), 0);
+            assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+            context.assertFalse(jedis.hexists(getLocksRedisKey(), "queue1"));
             async.complete();
         });
     }
@@ -170,6 +281,91 @@ public class RedisQuesTest extends AbstractTestCase {
                 context.assertEquals(OK, message1.result().body().getString(STATUS));
                 assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
                 async.complete();
+            });
+        });
+    }
+
+    @Test
+    public void deleteAllQueueItemsLegacyOperation(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        final String queue = "queue1";
+        eventBusSend(buildEnqueueOperation(queue, "some_val"), message -> {
+            context.assertEquals(OK, message.result().body().getString(STATUS));
+            assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+
+            // use legacy operation without any 'unlock' configuration
+            eventBusSend(buildOperation(QueueOperation.deleteAllQueueItems, new JsonObject().put(QUEUENAME, queue)), message1 -> {
+                context.assertEquals(OK, message1.result().body().getString(STATUS));
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                async.complete();
+            });
+        });
+    }
+
+    @Test
+    public void deleteAllQueueItemsWithLockLegacy(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        final String queue = "queue1";
+
+        eventBusSend(buildPutLockOperation(queue, "geronimo"), event -> {
+            context.assertTrue(jedis.hexists(getLocksRedisKey(), queue));
+            eventBusSend(buildEnqueueOperation(queue, "some_val"), message -> {
+                context.assertEquals(OK, message.result().body().getString(STATUS));
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+                eventBusSend(buildDeleteAllQueueItemsOperation(queue), message1 -> {
+                    context.assertEquals(OK, message1.result().body().getString(STATUS));
+                    assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                    context.assertTrue(jedis.hexists(getLocksRedisKey(), queue)); // check that lock still exists
+                    async.complete();
+                });
+            });
+        });
+    }
+
+    @Test
+    public void deleteAllQueueItemsWithLockDontUnlock(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        final String queue = "queue1";
+
+        eventBusSend(buildPutLockOperation(queue, "geronimo"), event -> {
+            context.assertTrue(jedis.hexists(getLocksRedisKey(), queue));
+            eventBusSend(buildEnqueueOperation(queue, "some_val"), message -> {
+                context.assertEquals(OK, message.result().body().getString(STATUS));
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+                eventBusSend(buildDeleteAllQueueItemsOperation(queue, false), message1 -> {
+                    context.assertEquals(OK, message1.result().body().getString(STATUS));
+                    assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                    context.assertTrue(jedis.hexists(getLocksRedisKey(), queue)); // check that lock still exists
+                    async.complete();
+                });
+            });
+        });
+    }
+
+    @Test
+    public void deleteAllQueueItemsWithLockDoUnlock(TestContext context) {
+        Async async = context.async();
+        flushAll();
+        assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+        final String queue = "queue1";
+
+        eventBusSend(buildPutLockOperation(queue, "geronimo"), event -> {
+            context.assertTrue(jedis.hexists(getLocksRedisKey(), queue));
+            eventBusSend(buildEnqueueOperation(queue, "some_val"), message -> {
+                context.assertEquals(OK, message.result().body().getString(STATUS));
+                assertKeyCount(context, getQueuesRedisKeyPrefix(), 1);
+                eventBusSend(buildDeleteAllQueueItemsOperation(queue, true), message1 -> {
+                    context.assertEquals(OK, message1.result().body().getString(STATUS));
+                    assertKeyCount(context, getQueuesRedisKeyPrefix(), 0);
+                    context.assertFalse(jedis.hexists(getLocksRedisKey(), queue)); // check that lock doesn't exist anymore
+                    async.complete();
+                });
             });
         });
     }

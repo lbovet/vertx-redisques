@@ -340,7 +340,13 @@ public class RedisQuesProcessorTest extends AbstractTestCase {
         String queue = "queue1";
         final AtomicBoolean processorCalled = new AtomicBoolean(false);
 
-        queueProcessor.handler(event -> processorCalled.set(true));
+        long start = System.currentTimeMillis();
+
+        queueProcessor.handler(event -> {
+            long duration = System.currentTimeMillis() - start;
+            context.assertTrue(duration < 50, "QueueProcessor should have been called after 50ms");
+            processorCalled.set(true);
+        });
 
         eventBusSend(buildEnqueueOperation(queue, "hello"), reply -> {
             context.assertEquals(OK, reply.result().body().getString(STATUS));

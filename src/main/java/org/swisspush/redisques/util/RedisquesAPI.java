@@ -21,14 +21,19 @@ public class RedisquesAPI {
     public static final String MESSAGE = "message";
     public static final String PAYLOAD = "payload";
     public static final String QUEUENAME = "queuename";
+    public static final String UNLOCK = "unlock";
     public static final String OPERATION = "operation";
     public static final String REQUESTED_BY = "requestedBy";
     public static final String NO_SUCH_LOCK = "No such lock";
+    public static final String PROCESSOR_DELAY_MAX = "processorDelayMax";
 
     private static Logger log = LoggerFactory.getLogger(RedisquesAPI.class);
 
     public enum QueueOperation {
         enqueue(null),
+        lockedEnqueue(null),
+        getConfiguration(null),
+        setConfiguration(null),
         check(null),
         reset(null),
         stop(null),
@@ -85,9 +90,11 @@ public class RedisquesAPI {
         return op;
     }
 
-    public static JsonObject buildCheckOperation(){
-        return buildOperation(QueueOperation.check);
-    }
+    public static JsonObject buildGetConfigurationOperation() { return buildOperation(QueueOperation.getConfiguration); }
+
+    public static JsonObject buildSetConfigurationOperation(JsonObject configuration) { return buildOperation(QueueOperation.setConfiguration, configuration); }
+
+    public static JsonObject buildCheckOperation(){ return buildOperation(QueueOperation.check); }
 
     public static JsonObject buildEnqueueOperation(String queueName, String message){
         JsonObject operation = buildOperation(QueueOperation.enqueue, new JsonObject().put(QUEUENAME, queueName));
@@ -95,28 +102,38 @@ public class RedisquesAPI {
         return operation;
     }
 
+    public static JsonObject buildLockedEnqueueOperation(String queueName, String message, String lockRequestedBy){
+        JsonObject operation = buildOperation(QueueOperation.lockedEnqueue, new JsonObject().put(QUEUENAME, queueName).put(REQUESTED_BY, lockRequestedBy));
+        operation.put(MESSAGE, message);
+        return operation;
+    }
+
     public static JsonObject buildGetQueueItemsOperation(String queueName, String limit){
-        return buildOperation(QueueOperation.getQueueItems, new JsonObject().put(QUEUENAME, queueName).put("limit", limit));
+        return buildOperation(QueueOperation.getQueueItems, new JsonObject().put(QUEUENAME, queueName).put(LIMIT, limit));
     }
 
     public static JsonObject buildAddQueueItemOperation(String queueName, String buffer){
-        return buildOperation(QueueOperation.addQueueItem, new JsonObject().put(QUEUENAME, queueName).put("buffer", buffer));
+        return buildOperation(QueueOperation.addQueueItem, new JsonObject().put(QUEUENAME, queueName).put(BUFFER, buffer));
     }
 
     public static JsonObject buildGetQueueItemOperation(String queueName, int index){
-        return buildOperation(QueueOperation.getQueueItem, new JsonObject().put(QUEUENAME, queueName).put("index", index));
+        return buildOperation(QueueOperation.getQueueItem, new JsonObject().put(QUEUENAME, queueName).put(INDEX, index));
     }
 
     public static JsonObject buildReplaceQueueItemOperation(String queueName, int index, String buffer){
-        return buildOperation(QueueOperation.replaceQueueItem, new JsonObject().put(QUEUENAME, queueName).put("index", index).put("buffer", buffer));
+        return buildOperation(QueueOperation.replaceQueueItem, new JsonObject().put(QUEUENAME, queueName).put(INDEX, index).put(BUFFER, buffer));
     }
 
     public static JsonObject buildDeleteQueueItemOperation(String queueName, int index){
-        return buildOperation(QueueOperation.deleteQueueItem, new JsonObject().put(QUEUENAME, queueName).put("index", index));
+        return buildOperation(QueueOperation.deleteQueueItem, new JsonObject().put(QUEUENAME, queueName).put(INDEX, index));
     }
 
     public static JsonObject buildDeleteAllQueueItemsOperation(String queueName){
-        return buildOperation(QueueOperation.deleteAllQueueItems, new JsonObject().put(QUEUENAME, queueName));
+        return buildDeleteAllQueueItemsOperation(queueName, false);
+    }
+
+    public static JsonObject buildDeleteAllQueueItemsOperation(String queueName, boolean unlock){
+        return buildOperation(QueueOperation.deleteAllQueueItems, new JsonObject().put(QUEUENAME, queueName).put(UNLOCK, unlock));
     }
 
     public static JsonObject buildGetQueuesOperation(){

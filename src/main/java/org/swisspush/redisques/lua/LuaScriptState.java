@@ -34,7 +34,7 @@ public class LuaScriptState {
     /**
      * Reads the script from the classpath and removes logging output if logoutput is false.
      * The script is stored in the class member script.
-     * @param luaScriptType
+     * @param luaScriptType the lua script type
      */
     private void composeLuaScript(LuaScript luaScriptType) {
         log.info("read the lua script for script type: " + luaScriptType);
